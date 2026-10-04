@@ -20,7 +20,3 @@ licensing terms:
 
 This document is a summary, not a license grant. Commercial terms are
 negotiated and granted separately in writing.
-
-`kepubverto` builds on [kepubify](https://github.com/pgaskin/kepubify) by
-Patrick Gaskin, which is MIT-licensed. Its notice is kept in
-[`LICENSE-kepubify`](./LICENSE-kepubify) under either license.

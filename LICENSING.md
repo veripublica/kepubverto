@@ -66,11 +66,11 @@ which walks through GPLv3 §13 and AGPLv3 §13 and quotes both.
 
 ## What about kepubify?
 
-`kepubverto` builds on [kepubify](https://github.com/pgaskin/kepubify) by
-Patrick Gaskin. kepubify is MIT-licensed, which permits exactly this: using its
-work in software distributed under other terms, AGPL and commercial alike, as
-long as its copyright notice and permission notice travel with it. They do, in
-[`LICENSE-kepubify`](./LICENSE-kepubify), under both licenses.
+[kepubify](https://github.com/pgaskin/kepubify) by Patrick Gaskin is the
+reference EPUB → KEPUB converter, and `kepubverto` is measured against its
+output. `kepubverto` is its own implementation and contains no kepubify code.
+kepubify is MIT-licensed; if any of its code is ever used here, its copyright
+and permission notice will ship with it, under both licenses.
 
 ## Contributing
 
