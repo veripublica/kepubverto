@@ -1,0 +1,196 @@
+<!doctype html>
+<!-- family-web template v3 (family-web v0.3.1) -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>kepubverto — EPUB to KEPUB for Kobo e-readers, in your browser</title>
+    <link rel="stylesheet" href="./tokens.css" />
+    <link rel="stylesheet" href="./demo.css" />
+    <script>
+      // Theme, part 1 of 2: before the first paint, so a stored choice never
+      // flashes. See family-web's skeleton.html.
+      try {
+        if (CSS.supports("color", "light-dark(#000,#fff)")) {
+          const t = localStorage.getItem("theme");
+          if (t === "dark" || t === "light") document.documentElement.dataset.theme = t;
+        }
+      } catch {}
+    </script>
+    <style>
+      .actionbar { display: flex; gap: .75rem; align-items: center; flex-wrap: wrap; margin: 1rem 0; }
+      td.path { word-break: break-all; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="topbar">
+        <h1>kepubverto</h1>
+        <button class="theme-toggle" id="theme" type="button"></button>
+        <script>
+          (() => {
+            const root = document.documentElement;
+            const btn = document.getElementById("theme");
+            const cycle = ["auto", "dark", "light"];
+            const label = { auto: "◐ auto", dark: "☾ dark", light: "☀ light" };
+            const save = (v) => {
+              try {
+                v ? localStorage.setItem("theme", v) : localStorage.removeItem("theme");
+              } catch {}
+            };
+            const current = () => root.dataset.theme || "auto";
+            const paint = () => {
+              btn.textContent = label[current()];
+              btn.title = "Theme: " + current() + " — click to change";
+            };
+            btn.addEventListener("click", () => {
+              const next = cycle[(cycle.indexOf(current()) + 1) % cycle.length];
+              if (next === "auto") delete root.dataset.theme;
+              else root.dataset.theme = next;
+              save(next === "auto" ? null : next);
+              paint();
+            });
+            paint();
+          })();
+        </script>
+      </div>
+      <p class="sub">Converts an EPUB to a KEPUB for Kobo e-readers, in pure Rust, entirely in your browser — no upload, no server. Your file never leaves this page.</p>
+
+      <label class="drop" id="drop">
+        <input type="file" id="file" accept=".epub,application/epub+zip" />
+        Drop an <strong>.epub</strong> here, or click to choose one.
+      </label>
+
+      <p class="status" id="status">Loading converter…</p>
+
+      <section id="result" hidden>
+        <div id="verdict"></div>
+        <p class="counts" id="counts"></p>
+        <div class="actionbar">
+          <button class="primary" id="download" type="button">Download</button>
+          <span id="outname"></span>
+        </div>
+        <div id="left" hidden>
+          <p>These documents could not be converted and are in the download exactly as they were:</p>
+          <table>
+            <thead><tr><th>Document</th><th>Why</th></tr></thead>
+            <tbody id="leftrows"></tbody>
+          </table>
+        </div>
+        <p class="sub">kepubverto converts; it does not check the book. To check it, use
+          <a href="https://veripublica.github.io/epubveri/">epubveri</a>.</p>
+      </section>
+
+      <footer>
+        Built with <code>wasm-pack</code> from the <code>kepubverto-wasm</code> crate.
+        <span id="ver"></span>
+        <nav class="family">
+          A <a href="https://github.com/veripublica">veripublica</a> tool ·
+          <a href="https://github.com/veripublica/epubveri">epubveri</a>
+          <a href="https://github.com/veripublica/epubsana">epubsana</a>
+          <a href="https://github.com/veripublica/kepubverto" aria-current="page">kepubverto</a>
+          <a href="https://github.com/veripublica/epublift">epublift</a>
+        </nav>
+      </footer>
+    </main>
+
+    <script type="module">
+      import init, { version, convert } from "../pkg/kepubverto_wasm.js";
+
+      const $ = (id) => document.getElementById(id);
+      const statusEl = $("status");
+      const dropEl = $("drop");
+      const fileEl = $("file");
+
+      let ready = false;
+      let output = null;
+      init()
+        .then(() => {
+          ready = true;
+          statusEl.textContent = "Ready. Drop an .epub.";
+          $("ver").textContent = "kepubverto-wasm v" + version();
+        })
+        .catch((e) => {
+          statusEl.textContent = "Failed to load: " + e;
+        });
+
+      // book.epub → book.kepub.epub, the CLI's default name.
+      const outName = (name) => name.replace(/\.epub$/i, "") + ".kepub.epub";
+
+      async function run(file) {
+        if (!ready) return;
+        $("result").hidden = true;
+        statusEl.textContent = "Converting " + file.name + "…";
+        let r;
+        try {
+          r = convert(new Uint8Array(await file.arrayBuffer()));
+        } catch (e) {
+          statusEl.textContent = "Could not convert " + file.name + ": " + (e.message || e);
+          return;
+        }
+        const docs = r.documents;
+        const count = (o) => docs.filter((d) => d.outcome === o).length;
+        const spans = docs.reduce((n, d) => n + d.spans, 0);
+        const left = docs.filter((d) => d.outcome === "left_alone");
+
+        $("verdict").innerHTML = r.complete
+          ? '<span class="verdict valid">✓ Converted</span>'
+          : '<span class="verdict invalid">Converted, with ' + left.length +
+            " document" + (left.length === 1 ? "" : "s") + " left as they were</span>";
+        let counts = count("converted") + " of " + docs.length + " content documents converted, " +
+          spans.toLocaleString("en") + " spans added";
+        if (count("already_converted")) counts += ", " + count("already_converted") + " already converted";
+        $("counts").textContent = counts + ".";
+
+        const rows = $("leftrows");
+        rows.replaceChildren();
+        for (const d of left) {
+          const tr = document.createElement("tr");
+          const p = document.createElement("td");
+          p.className = "path";
+          p.textContent = d.path;
+          const w = document.createElement("td");
+          w.textContent = d.reason;
+          tr.append(p, w);
+          rows.append(tr);
+        }
+        $("left").hidden = left.length === 0;
+
+        output = { name: outName(file.name), bytes: r.epub };
+        $("outname").textContent = output.name;
+        statusEl.textContent = "";
+        $("result").hidden = false;
+      }
+
+      $("download").addEventListener("click", () => {
+        if (!output) return;
+        const url = URL.createObjectURL(new Blob([output.bytes], { type: "application/epub+zip" }));
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = output.name;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      });
+
+      fileEl.addEventListener("change", () => {
+        if (fileEl.files.length) run(fileEl.files[0]);
+      });
+      ["dragenter", "dragover"].forEach((ev) =>
+        dropEl.addEventListener(ev, (e) => {
+          e.preventDefault();
+          dropEl.classList.add("over");
+        }),
+      );
+      ["dragleave", "drop"].forEach((ev) =>
+        dropEl.addEventListener(ev, (e) => {
+          e.preventDefault();
+          dropEl.classList.remove("over");
+        }),
+      );
+      dropEl.addEventListener("drop", (e) => {
+        const f = e.dataTransfer?.files?.[0];
+        if (f) run(f);
+      });
+    </script>
+  </body>
+</html>

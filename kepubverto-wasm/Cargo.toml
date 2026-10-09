@@ -9,6 +9,7 @@ license = "AGPL-3.0-only OR LicenseRef-veripublica-Commercial"
 # consumer is wasm-pack → the npm package under the @veripublica scope.
 repository = "git+https://github.com/veripublica/kepubverto.git"
 homepage = "https://github.com/veripublica/kepubverto"
+readme = "README.md"
 keywords = ["epub", "kepub", "kobo", "wasm", "ebook"]
 publish = false
 

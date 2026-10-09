@@ -27,8 +27,8 @@ program it compiles.
 
 `kepubverto` does write to your book — that is its job — so it is fair to ask
 what it adds. The conversion itself adds structural markup: `koboSpan`
-wrappers around sentences, with identifiers derived mechanically from their
-position; the `book-columns` / `book-inner` wrapper divs; and one small
+wrappers around sentences and images, with identifiers derived mechanically
+from their position; the `book-columns` / `book-inner` wrapper divs; and one small
 `<style>` rule for them. Optional fixes you switch on change your own text or
 add CSS you supply. Nothing expressive of ours, and nothing we would have any
 claim over even if the license reached the output, which it does not.

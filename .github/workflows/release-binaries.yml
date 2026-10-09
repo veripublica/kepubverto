@@ -1,0 +1,193 @@
+name: Release binaries
+
+# Builds the `kepubverto` CLI for a broad set of Linux/macOS/Windows targets and
+# attaches the archives to the matching GitHub Release. Pure Rust with no C
+# dependencies, so every target builds on a runner of its own native
+# architecture (x86_64 and ARM64 runners for both Linux and macOS; the one
+# genuine cross-compile is ARM64 Windows, which the MSVC toolchain links from
+# the x86_64 Windows runner). The only per-target setup is `musl-tools` for the
+# static-musl Linux builds. Triggered automatically when a `v*` tag is pushed
+# (the same tags used for GitHub Releases); `workflow_dispatch` allows a manual
+# re-run against an existing tag (e.g. to backfill a release with new targets).
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag/release to attach binaries to (e.g. v0.1.0)"
+        required: true
+
+# Read-only by default. Only the `release` job, which attaches files and signs
+# the attestation, is granted more.
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux x86_64 - glibc (portable across mainstream distros) and musl
+          # (fully static, runs anywhere incl. Alpine / very old glibc).
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+          # Linux ARM64 - native on GitHub's ARM64 runner.
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-24.04-arm
+          - target: aarch64-unknown-linux-musl
+            os: ubuntu-24.04-arm
+          # macOS - Intel and Apple Silicon.
+          - target: x86_64-apple-darwin
+            os: macos-latest
+          - target: aarch64-apple-darwin
+            os: macos-latest
+          # Windows - x86_64 (native) and ARM64 (cross-linked by MSVC).
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+          - target: aarch64-pc-windows-msvc
+            os: windows-latest
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Check out
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      # The static-musl targets link with musl-gcc; every other target uses the
+      # runner's default toolchain as-is.
+      - name: Install musl tools
+        if: contains(matrix.target, 'musl')
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+
+      - name: Add target
+        run: rustup target add ${{ matrix.target }}
+
+      - name: Build (release)
+        run: cargo build --release --locked --bin kepubverto --target ${{ matrix.target }}
+
+      - name: Package (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          set -euo pipefail
+          stage="kepubverto-${{ matrix.target }}"
+          mkdir "$stage"
+          cp "target/${{ matrix.target }}/release/kepubverto" "$stage/"
+          cp LICENSE LICENSE-COMMERCIAL.md README.md "$stage/"
+          tar czf "$stage.tar.gz" "$stage"
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $stage = "kepubverto-${{ matrix.target }}"
+          New-Item -ItemType Directory -Path $stage | Out-Null
+          Copy-Item "target/${{ matrix.target }}/release/kepubverto.exe" $stage/
+          Copy-Item LICENSE, LICENSE-COMMERCIAL.md, README.md $stage/
+          Compress-Archive -Path $stage -DestinationPath "$stage.zip"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: kepubverto-${{ matrix.target }}
+          path: |
+            kepubverto-${{ matrix.target }}.tar.gz
+            kepubverto-${{ matrix.target }}.zip
+          if-no-files-found: ignore
+
+  # Everything that writes to the release happens here, once, after all eight
+  # builds: the checksum list and the provenance attestation must cover every
+  # archive, and a per-target job cannot see the others'.
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      # Both are for the provenance attestation below: `id-token` to get the
+      # OIDC token it signs with, `attestations` to record the result.
+      id-token: write
+      attestations: write
+    steps:
+      - name: Check out
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          path: dist
+          merge-multiple: true
+
+      # `if-no-files-found: ignore` above means a packaging step that silently
+      # produced nothing still reports success, so `needs: build` cannot catch
+      # it. Assert the count before anything is written: eight targets, six
+      # tarballs and two zips.
+      - name: Check every target produced an archive
+        shell: bash
+        working-directory: dist
+        run: |
+          set -euo pipefail
+          ls -l
+          n=$(ls -1 kepubverto-*.tar.gz kepubverto-*.zip 2>/dev/null | wc -l | tr -d ' ')
+          if [ "$n" -ne 8 ]; then
+            echo "expected 8 archives, found $n" >&2
+            exit 1
+          fi
+
+      # The plain, offline half of "is this what the build produced":
+      # `sha256sum -c` needs no tooling and no network. It sits next to the
+      # archives, so anyone able to replace one could replace the other; the
+      # attestation below is the half without that weakness.
+      - name: Write SHA256SUMS.txt
+        shell: bash
+        working-directory: dist
+        run: |
+          set -euo pipefail
+          sha256sum kepubverto-*.tar.gz kepubverto-*.zip > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      # Signed build provenance: which commit, workflow and runner produced
+      # each archive, verifiable with `gh attestation verify`. The binary is
+      # the artefact people run, so it should not be the one without it.
+      # Only the archives are subjects; signing SHA256SUMS.txt would sign a
+      # list of hashes rather than the things themselves.
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            dist/kepubverto-*.tar.gz
+            dist/kepubverto-*.zip
+
+      # Populate the GitHub Release body from this version's CHANGELOG.md
+      # section, so the release notes are never filled in by hand — which is the
+      # step that gets forgotten (epubveri's v0.5.0/0.5.1/0.5.2 shipped with
+      # blank release pages while their CHANGELOG entries existed; see
+      # veripublica/epubveri, "ci: auto-fill GitHub Release notes").
+      - name: Extract release notes from CHANGELOG
+        shell: bash
+        run: |
+          tag="${{ inputs.tag || github.ref_name }}"
+          ver="${tag#v}"
+          awk -v ver="$ver" '
+            $0 ~ "^## \\[" ver "\\]" {inblk=1; next}
+            inblk && /^## \[/ {exit}
+            inblk { if (!started && $0 ~ /^[[:space:]]*$/) next; started=1; buf[n++]=$0 }
+            END { last=n-1; while (last>=0 && buf[last] ~ /^[[:space:]]*$/) last--; for (i=0;i<=last;i++) print buf[i] }
+          ' CHANGELOG.md > RELEASE_NOTES.md
+          # A tag whose version has no CHANGELOG section would otherwise publish
+          # an empty release body — the very failure this step exists to prevent.
+          if [ ! -s RELEASE_NOTES.md ]; then
+            echo "error: no '## [$ver]' section in CHANGELOG.md — add it before tagging" >&2
+            exit 1
+          fi
+          printf '\n\nFull notes: [CHANGELOG.md](https://github.com/veripublica/kepubverto/blob/main/CHANGELOG.md). Also on [crates.io](https://crates.io/crates/kepubverto/%s).\n' "$ver" >> RELEASE_NOTES.md
+          echo "----- extracted release notes -----"
+          cat RELEASE_NOTES.md
+
+      # One writer, one call, every archive and the checksum list.
+      - name: Attach to release
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
+        with:
+          tag_name: ${{ inputs.tag || github.ref_name }}
+          body_path: RELEASE_NOTES.md
+          files: dist/*
