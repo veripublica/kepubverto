@@ -60,8 +60,8 @@ impl std::error::Error for Error {}
 pub struct Conversion {
     /// The converted EPUB.
     pub epub: Vec<u8>,
-    /// One entry per XHTML content document in the manifest, in manifest
-    /// order.
+    /// One entry per content document in the manifest (`application/xhtml+xml`
+    /// or `text/html`), in manifest order.
     pub documents: Vec<Document>,
 }
 

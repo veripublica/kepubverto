@@ -47,7 +47,7 @@ was, and files it does not convert are copied from the archive unchanged.
 
 On the 544-book test shelf, the conversion added **no** validation findings
 (graded by [epubveri](https://github.com/veripublica/epubveri)), and the spans
-are identical to kepubify's in 520 books. In the rest, kepubify misreads an
+are identical to kepubify's in 525 books. In the rest, kepubify misreads an
 invalid document, or kepubverto leaves out a span that would be invalid while
 keeping kepubify's ids for all the others. [docs/SPANS.md](docs/SPANS.md) has
 the details.

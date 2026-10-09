@@ -20,6 +20,8 @@ rules](https://doc.rust-lang.org/cargo/reference/semver.html).
   unchanged.
 - Where a span would be invalid, it is counted and left out: the book gains
   no errors and every added span keeps kepubify's id.
+- Manifest items declared `text/html` are converted too, when they parse as
+  XML, as kepubify converts them.
 - The CLI (`kepubverto -i book.epub` → `book.kepub.epub`), following the
   veripublica conventions v0.6.
 - `kepubverto-wasm`, and a page that converts a book in the browser.

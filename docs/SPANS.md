@@ -52,7 +52,11 @@ at all.
 ## Which documents are converted
 
 A content document is every manifest item whose media type is
-`application/xhtml+xml`, the navigation document included. All other entries
+`application/xhtml+xml`, the navigation document included, or `text/html`.
+`text/html` is not a content-document type in either EPUB version, so a book
+with such an item is already invalid; kepubify converts these items like any
+other *(oracle)*, and kepubverto does too, so that their ids match. One that
+does not parse as XML is left untouched, like any other. All other entries
 (the OPF, CSS, images, fonts, …) are copied byte for byte.
 
 An EPUB 2 document whose DOCTYPE references the XHTML DTD may use that DTD's
@@ -256,18 +260,17 @@ around in one. The rule in
 [Where a span would be invalid](#where-a-span-would-be-invalid) came from
 the first such run.
 
-The run of 2026-10-09, all 544 shelf books, kepubify 4.0.4 as the oracle:
+The last run (2026-10-09), all 544 shelf books, kepubify 4.0.4 as the oracle:
 
 - **Findings added by the conversion: 0** (epubveri 0.24.0, errors and
   fatals, before and after).
-- **Spans identical to kepubify's in 520 books.** In the other 24, every
-  difference is one of: items declared `text/html`, which this version does
-  not convert (7 books, open question 3); spans left out where they would be
-  invalid, the rest carrying kepubify's ids (4 books); markup an HTML parser
-  rebuilds, a block element inside a `p` or a self-closed non-void element,
-  where kepubify misreads the document (13 books); and two documents whose
-  ids match while the text differs, because an HTML parser maps `&#128;` to
-  `&#159;` onto Windows-1252 characters.
+- **Spans identical to kepubify's in 525 books.** In the other 19, every
+  difference is one of: markup an HTML parser rebuilds, a block element inside
+  a `p` or a self-closed non-void element, where kepubify misreads the
+  document (13 books); spans left out where they would be invalid, the rest
+  carrying kepubify's ids (4 books); and two documents whose ids match while
+  the text differs, because an HTML parser maps `&#128;` to `&#159;` onto
+  Windows-1252 characters.
 
 ## What kepubverto does not do (in this version)
 
@@ -302,15 +305,10 @@ settled by the EPUB specification first and checked on a Kobo device second.
    One uses `kobo.P.S` ids, and it is already converted (it has `koboSpan`),
    so it is left alone under the rule above. Any other collision leaves the
    document untouched (see [Which documents are converted](#which-documents-are-converted)).
-3. **Items declared `text/html`.** 5 books. That media type is not allowed
-   for content documents in either EPUB version, so such a book is already
-   invalid. kepubify converts them like any other content document
-   *(oracle)*. Proposal: do the same when the document is well-formed XML,
-   so that ids match for those books. To check: what a Kobo reader does with
-   them.
-
 Settled:
 
+- **Items declared `text/html`** (5 books on the 2026-10-05 count). Converted
+  when they parse as XML (Baris, 2026-10-09), so that ids match kepubify's.
 - **Navigation document** (75 books, in the spine in 5). kepubify converts it
   whether or not it is in the spine *(oracle)*, and the converted `nav`
   validates (epubveri 0.24.0). kepubverto converts it too, as

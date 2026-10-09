@@ -116,7 +116,8 @@ impl<'a> Container<'a> {
 /// What the package document says about the content documents.
 pub struct Package {
     pub epub3: bool,
-    /// Container paths of the XHTML content documents, in manifest order.
+    /// Container paths of the content documents (`application/xhtml+xml`,
+    /// and `text/html`), in manifest order.
     pub documents: Vec<String>,
 }
 
@@ -152,10 +153,14 @@ pub fn package(c: &mut Container) -> Result<Package, Error> {
     for item in root.descendants().filter(|n| {
         n.has_tag_name("item") && n.parent().is_some_and(|p| p.has_tag_name("manifest"))
     }) {
-        let is_xhtml = item
-            .attribute("media-type")
-            .is_some_and(|m| m.trim().eq_ignore_ascii_case("application/xhtml+xml"));
-        if !is_xhtml {
+        // `text/html` is not a content-document type in either EPUB version,
+        // but kepubify converts such items, and so do we when they parse as
+        // XML, so that their ids match (docs/SPANS.md).
+        let is_content = item.attribute("media-type").is_some_and(|m| {
+            let m = m.trim();
+            m.eq_ignore_ascii_case("application/xhtml+xml") || m.eq_ignore_ascii_case("text/html")
+        });
+        if !is_content {
             continue;
         }
         let Some(href) = item.attribute("href") else {

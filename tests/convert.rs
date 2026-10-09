@@ -291,6 +291,30 @@ fn a_missing_document_is_reported_not_fatal() {
 }
 
 #[test]
+fn text_html_items_are_converted_like_xhtml() {
+    let input = book(true, &[&page(EPUB3_HEAD, "<p>x</p>")]);
+    let opf = entry(&input, "OEBPS/content.opf").replace(
+        r#"media-type="application/xhtml+xml""#,
+        r#"media-type="text/html""#,
+    );
+    let mut src = ZipArchive::new(Cursor::new(input.as_slice())).unwrap();
+    let mut z = ZipWriter::new(Cursor::new(Vec::new()));
+    for i in 0..src.len() {
+        let f = src.by_index_raw(i).unwrap();
+        if f.name() == "OEBPS/content.opf" {
+            drop(f);
+            z.start_file("OEBPS/content.opf", SimpleFileOptions::default())
+                .unwrap();
+            z.write_all(opf.as_bytes()).unwrap();
+        } else {
+            z.raw_copy_file(f).unwrap();
+        }
+    }
+    let c = convert(&z.finish().unwrap().into_inner()).unwrap();
+    assert_eq!(c.documents[0].outcome, Outcome::Converted { spans: 1 });
+}
+
+#[test]
 fn a_file_that_is_not_a_zip_is_an_error() {
     assert!(matches!(
         convert(b"not a zip"),
