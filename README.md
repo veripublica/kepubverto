@@ -13,8 +13,8 @@ conversion is still valid after it.
 
 ## Status
 
-Not released yet. The conversion works and is tested; the web page, the
-release binaries and `--format json` are still to come.
+Early but working: the conversion is tested on a 544-book shelf and on a
+real Kobo. `--format json` is still to come.
 
 What the conversion does is written down in [docs/SPANS.md](docs/SPANS.md),
 rule by rule. In short, in each XHTML content document it:
@@ -54,11 +54,30 @@ the details.
 
 ## Install
 
-Not on crates.io yet. To build from source, with a Rust toolchain:
+**Just want to convert a book?** No install at all: convert it right in your
+browser, with no upload, your file never leaves the page:
+**https://veripublica.github.io/kepubverto/**
+
+**The CLI, without installing Rust.** Pre-built binaries are attached to every
+[GitHub Release](https://github.com/veripublica/kepubverto/releases/latest),
+for macOS (Intel + Apple Silicon), Windows (x64 + ARM) and Linux (x64 + ARM,
+each as a fully static `musl` build that runs on any distribution, plus a
+dynamically-linked `gnu` variant). Download the archive for your platform,
+unpack it, and run the `kepubverto` binary directly. No toolchain needed.
+
+**From crates.io or npm**, if you have the toolchain:
 
 ```sh
-cargo install --locked --git https://github.com/veripublica/kepubverto kepubverto
+cargo install --locked kepubverto         # the CLI
+npm install @veripublica/kepubverto-wasm  # WASM bindings for the browser
 ```
+
+`--locked` builds with the exact dependency versions this release was tested
+against. **On Windows, Rust also needs Microsoft's linker**, which comes with
+[Build Tools for Visual
+Studio](https://visualstudio.microsoft.com/visual-cpp-build-tools/) when you
+tick *Desktop development with C++*. The pre-built Windows binary above needs
+none of this.
 
 ## Usage
 
