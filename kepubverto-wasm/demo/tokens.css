@@ -1,5 +1,10 @@
-/* veripublica family-web — tokens.css — template v3
+/* veripublica family-web — tokens.css — template v6
  * https://github.com/veripublica/family-web
+ *
+ * THIS IS A COPY. DO NOT EDIT IT. A change worth making is made in family-web, and
+ * your page's own styles go in your page — see the template README, "Where does
+ * my new style go?". An edited copy is found by family-web's check-copies.mjs, and
+ * the next re-copy erases it. (#14)
  *
  * The family's design tokens: one copy. Extracted 2026-07-10 from
  * epubveri-wasm and epubsana-wasm's demo pages, where this block was
