@@ -1,0 +1,25 @@
+[package]
+name = "kepubverto-wasm"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.88"
+description = "WebAssembly bindings for kepubverto — convert EPUB to KEPUB in the browser, no upload."
+license = "AGPL-3.0-only OR LicenseRef-veripublica-Commercial"
+# npm's canonical repository.url form. Not published to crates.io; its only
+# consumer is wasm-pack → the npm package under the @veripublica scope.
+repository = "git+https://github.com/veripublica/kepubverto.git"
+homepage = "https://github.com/veripublica/kepubverto"
+keywords = ["epub", "kepub", "kobo", "wasm", "ebook"]
+publish = false
+
+# A thin JS boundary over kepubverto's public API; no conversion logic of its own.
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+kepubverto = { path = ".." }
+wasm-bindgen = "0.2"
+serde = { version = "1", features = ["derive"] }
+# Held at 0.5.6 as epubveri and epubsana hold it: 0.5.7 deprecates the
+# `#[tsify(into_wasm_abi)]` used here. Pin tsify and tsify-macros together.
+tsify = { version = "0.5", features = ["js"] }

@@ -63,7 +63,11 @@ EPUB 3 such entities are an error, and the document is not well-formed.
 
 A content document is **left untouched**, and the report says why, when:
 
-- it is not well-formed XML;
+- it is not UTF-8 (every insertion is ASCII, but the sentence rules read
+  characters);
+- it is not well-formed XML. A character XML 1.0 forbids, such as a form
+  feed, makes a document not well-formed, even though an HTML parser, and so
+  kepubify, reads past it;
 - it fails the family's XML safety limits (nesting depth, entity expansion,
   attribute and element counts);
 - it already contains an element whose `class` includes the token `koboSpan`
@@ -72,17 +76,24 @@ A content document is **left untouched**, and the report says why, when:
   they are missing, and it appends its `<style>` again, so a book converted
   twice by kepubify carries the rule twice. Leaving the document alone
   differs from kepubify only in those two insertions, never in an id;
-- it already uses an id that the conversion would add (`book-columns`,
-  `book-inner`, or any `kobo.N.N`), since converting would create a
-  duplicate id.
+- it already uses an id that the conversion would add (`book-columns` or
+  `book-inner` when the divs are to be added, or any `kobo.N.N`), since
+  converting would create a duplicate id;
+- an entity the document declares itself expands to markup, so its parsed
+  elements do not sit at byte offsets of their own.
+
+An entity the document declares that expands to text is read as one ordinary
+letter by the sentence rules.
 
 ## Span numbering
 
 ### Walk order
 
 The rules walk the descendants of `<body>` in document order (depth first,
-parent before children). Only elements in the XHTML namespace are classified
-below. Elements in other namespaces count as "other elements".
+parent before children). The elements in the table are in the XHTML
+namespace, except `svg` and `math`, which are skipped in any namespace.
+Elements in other namespaces (`epub:switch`, …) count as "other elements":
+kepubify walks into them too *(oracle)*.
 
 Two counters are kept for the whole document: **P** (the paragraph) and
 **S** (the segment within it). Both start at 0. There is also a **pending**
@@ -93,9 +104,7 @@ flag, initially off.
 | Element | Effect |
 |---|---|
 | `script`, `style`, `pre`, `audio`, `video`, `svg`, `math` | Skipped with everything inside it. No spans are added inside, and the counters do not move. *(oracle)* |
-| `p`, `ol`, `ul`, `table`, `h1` to `h6` | Sets **pending**, then its contents are walked. *(oracle)* |
-| `option`, `textarea` | Skipped like the row above. Their content model is text only, so a span inside them is invalid. **This differs from kepubify**, which wraps them. |
-| `img` inside `picture` | Left unwrapped, and the counters do not move. `picture` may not contain a `span`. **Differs from kepubify.** |
+| `p`, `ol`, `ul`, `table`, `h1` to `h6` | Sets **pending**, then its contents are walked. An empty `<p/>` sets **pending** like `<p></p>`. *(oracle)* |
 | `img` | P increases by 1, S becomes 1, **pending** is cleared, and the `img` is wrapped in a span `kobo.P.1`. *(oracle)* |
 | any other element (`div`, `li`, `span`, `a`, `blockquote`, …) | Its contents are walked. The counters are not affected. |
 
@@ -108,13 +117,42 @@ and the ids must match.
 lazily, so an empty `<p>` or a `<p>` holding only an image uses no paragraph
 number of its own.
 
+### Where a span would be invalid
+
+kepubify wraps text and images wherever it finds them, including places
+where a `span` is not allowed: text in an `option` or a `textarea`, an `img`
+in a `picture`, and, in EPUB 2, text directly in a `blockquote` (XHTML 1.1
+allows only block content there). The result is invalid: on the test shelf, two
+books gained 3,994 `RSC-005` errors this way.
+
+kepubverto **counts** such a segment or image exactly as the rules below say,
+and then does **not** wrap it. The counters move as if the span had been
+added, so every span that is added carries kepubify's id; the ids that are
+left out are simply absent. *(oracle: the spans kepubverto adds are a subset
+of kepubify's, with the same ids)*
+
+A `span` is not allowed as a child of these XHTML elements: `option`,
+`textarea`, `select`, `optgroup`, `datalist`, `picture`, `table`, `thead`,
+`tbody`, `tfoot`, `tr`, `colgroup`, `ul`, `ol`, `dl`, `hgroup`. In EPUB 2 also
+`blockquote`, `form`, `noscript` and `map`, and `body` itself, unless the
+divs are added, since text in `body` then ends up in `div#book-inner`.
+Elements in another namespace accept one, as kepubify assumes.
+
+Whitespace-only text in these places is not wrapped anyway (see below), so
+the rule only reaches text or images that already make the document invalid.
+The book stays as invalid as it was, and gets no worse.
+
 ### Text
 
 Each text node in the walk is split into **segments** (see
 [Sentence segments](#sentence-segments)). For each segment, in order:
 
 - If the segment is whitespace only and the text node's **direct** parent is
-  not a `p`, it is written as it was, with no span.
+  not a `p`, it is written as it was, with no span. Whitespace here is every
+  Unicode `White_Space` character, NO-BREAK SPACE and EM SPACE included, so a
+  `<div>&#160;</div>` gets no span *(oracle)*. This is wider than the
+  whitespace a sentence cut needs (below): kepubify uses two definitions, and
+  so does kepubverto.
 - Otherwise: if **pending** is set, P increases by 1, S becomes 0, and
   **pending** is cleared. Then S increases by 1, and the segment is wrapped in
   a span `kobo.P.S`. *(oracle)*
@@ -141,7 +179,8 @@ character that follows all of these, in order:
 1. one or more of `.` `!` `?`;
 2. optionally **one** closing character: `'` `"` `”` `’` `“` `…`;
 3. one or more whitespace characters, where whitespace means only space, tab,
-   line feed, carriage return and form feed (not NO-BREAK SPACE);
+   line feed and carriage return (not NO-BREAK SPACE; a form feed would count
+   too, but XML 1.0 does not allow one in a document);
 
 and when that next character is not itself whitespace. The whitespace stays
 at the end of the earlier segment. *(oracle)*
@@ -160,8 +199,8 @@ Consequences, each a test:
 | `Mr. Smith. A.B. c` | `Mr. ` · `Smith. ` · `A.B. ` · `c` |
 | `A!!! B?? C.?! D` | `A!!! ` · `B?? ` · `C.?! ` · `D` |
 | `A… B. C’ D.’ E.“ F.” G` | `A… B. ` · `C’ D.’ ` · `E.“ ` · `F.” ` · `G` |
-| `One.` + form feed + `Two` | `One.` + form feed · `Two` |
 | `End. ` (at the end of the text) | one segment; never an empty one |
+| `x. ` + NO-BREAK SPACE | `x. ` · NO-BREAK SPACE (a whitespace-only segment, see [Text](#text)) |
 
 Characters are classified **after** entity and character references are
 decoded: `&#46;` is a full stop, `&nbsp;` is not whitespace. The cut itself
@@ -213,7 +252,22 @@ conversion is built and tested, not on a check at run time:
   converted, and the findings the conversion added must be zero.
 
 A defect found that way is fixed in the rules, for every book, never patched
-around in one.
+around in one. The rule in
+[Where a span would be invalid](#where-a-span-would-be-invalid) came from
+the first such run.
+
+The run of 2026-10-09, all 544 shelf books, kepubify 4.0.4 as the oracle:
+
+- **Findings added by the conversion: 0** (epubveri 0.24.0, errors and
+  fatals, before and after).
+- **Spans identical to kepubify's in 520 books.** In the other 24, every
+  difference is one of: items declared `text/html`, which this version does
+  not convert (7 books, open question 3); spans left out where they would be
+  invalid, the rest carrying kepubify's ids (4 books); markup an HTML parser
+  rebuilds, a block element inside a `p` or a self-closed non-void element,
+  where kepubify misreads the document (13 books); and two documents whose
+  ids match while the text differs, because an HTML parser maps `&#128;` to
+  `&#159;` onto Windows-1252 characters.
 
 ## What kepubverto does not do (in this version)
 
@@ -241,11 +295,9 @@ span id, so they do not affect compatibility.
 Counts are from the 544-book test shelf (2026-10-05). Each question is
 settled by the EPUB specification first and checked on a Kobo device second.
 
-1. **Elements that may not contain a `span`:** text inside `option` or
-   `textarea`, and an `img` inside `picture`. kepubify wraps these, and the
-   result is invalid. The specification wins: kepubverto skips them. The shelf
-   has no such element, so ids do not diverge in practice. A device test
-   should confirm that the reader does not need spans there.
+1. **Ids left out.** Where a span would be invalid, its id is left out (see
+   [Where a span would be invalid](#where-a-span-would-be-invalid)). A device
+   test should confirm that a reader does not need the missing ids.
 2. **Ids already in use.** No shelf book uses `book-columns` or `book-inner`.
    One uses `kobo.P.S` ids, and it is already converted (it has `koboSpan`),
    so it is left alone under the rule above. Any other collision leaves the
