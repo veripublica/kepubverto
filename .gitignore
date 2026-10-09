@@ -1,0 +1,4 @@
+/target
+
+# wasm-pack output
+/kepubverto-wasm/pkg/

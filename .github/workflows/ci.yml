@@ -1,0 +1,114 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Cancel superseded runs on the same ref (e.g. rapid pushes to a PR).
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      # ubuntu-latest ships stable Rust + rustfmt; we only add the wasm target
+      # for the smoke builds below. All deps come from crates.io — no sibling
+      # checkout.
+      - name: Add wasm target
+        run: rustup target add wasm32-unknown-unknown
+
+      - name: Format (cargo fmt --check)
+        run: cargo fmt --all --check
+
+      - name: Build (workspace)
+        run: cargo build --workspace --locked
+
+      - name: Test (workspace)
+        run: cargo test --workspace --locked
+
+      # Broken intra-doc links and bare URLs show up only as rustdoc warnings,
+      # so warnings are denied (epubveri's and epubsana's gate).
+      - name: Docs (rustdoc, warnings denied)
+        env:
+          RUSTDOCFLAGS: -D warnings
+        run: cargo doc --workspace --no-deps --locked
+
+      # A version requirement is a promise: "this crate builds against anything
+      # from here up". Build against the *declared minimum* epubveri to keep it
+      # honest (epubsana once shipped a floor below the API it used).
+      - name: Build against the declared minimum epubveri
+        run: |
+          set -euo pipefail
+          # The floor may be `0.24` or `0.24.3`; a missing patch means `.0`.
+          min=$(grep -E '^epubveri = "' Cargo.toml \
+                | sed -E 's/^epubveri = "\^?([0-9]+(\.[0-9]+){1,2})".*/\1/')
+          case "$min" in
+            *.*.*) ;;
+            *.*)   min="$min.0" ;;
+            *)     echo "error: could not read the epubveri floor from Cargo.toml (got '$min')" >&2
+                   exit 1 ;;
+          esac
+          echo "declared minimum: $min"
+          cargo update -p epubveri --precise "$min"
+          cargo check --workspace
+          git checkout -- Cargo.lock
+
+      # Prove the converter still compiles to WebAssembly: the core library and
+      # the bindings crate (which exercises the wasm-bindgen / tsify codegen).
+      - name: Build core lib for wasm32
+        run: cargo build --lib --target wasm32-unknown-unknown --locked
+
+      - name: Build kepubverto-wasm for wasm32
+        run: cargo build -p kepubverto-wasm --target wasm32-unknown-unknown --locked
+
+  # The published MSRV, actually tested: `rust-version` is a promise on
+  # crates.io. Read from both manifests, which must agree.
+  msrv:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - name: Read the declared MSRV
+        id: msrv
+        run: |
+          set -euo pipefail
+          v=$(grep -m1 '^rust-version' Cargo.toml | cut -d'"' -f2)
+          w=$(grep -m1 '^rust-version' kepubverto-wasm/Cargo.toml | cut -d'"' -f2)
+          test -n "$v" || { echo "error: no rust-version in Cargo.toml" >&2; exit 1; }
+          test "$v" = "$w" || { echo "error: rust-version differs: Cargo.toml '$v', kepubverto-wasm/Cargo.toml '$w'" >&2; exit 1; }
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "declared MSRV: $v"
+
+      - name: Install it
+        run: |
+          rustup toolchain install "${{ steps.msrv.outputs.version }}" --profile minimal
+          rustup default "${{ steps.msrv.outputs.version }}"
+          rustc -V
+
+      - name: Compile at the floor
+        run: cargo check --workspace --locked
+
+  # RustSec audit of Cargo.lock, its own job because its verdict depends on
+  # the advisory database, not on our commit. audit.yml runs it weekly too.
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+    steps:
+      - name: Check out
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      # `v2` upstream is a branch, not a tag, so this pins the commit v2.0.0
+      # names (checked 2026-09-23 with git ls-remote).
+      - name: Audit dependencies
+        uses: rustsec/audit-check@69366f33c96575abad1ee0dba8212993eecbe998 # v2.0.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
