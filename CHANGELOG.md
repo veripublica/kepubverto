@@ -8,6 +8,24 @@ kepubverto is pre-1.0, so breaking changes land as minor-version bumps
 (`0.x.0`), per [Cargo's SemVer compatibility
 rules](https://doc.rust-lang.org/cargo/reference/semver.html).
 
+## [Unreleased]
+
+### Fixed
+
+- The style element no longer makes a valid EPUB 2 book invalid. 0.1.0 wrote
+  kepubify's `<style type="text/css" class="kobostylehacks">` in every
+  document. XHTML 1.1 allows no `class` on `<style>`, so epubcheck reported an
+  error (RSC-005) in each converted EPUB 2 document. In EPUB 3 the obsolete
+  `type` added a usage finding (RSC-036) per document. The element now
+  follows the EPUB version: `<style type="text/css">` in EPUB 2,
+  `<style class="kobostylehacks">` in EPUB 3. The rule inside is unchanged.
+
+### Changed
+
+- The validity tests fail on any finding the conversion adds, usage
+  included, not only on errors. They grade with epubveri 0.25, the first
+  release that reports the EPUB 2 `<style>` errors.
+
 ## [0.1.0] - 2026-10-09
 
 ### Added

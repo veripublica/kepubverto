@@ -220,19 +220,32 @@ done when `<body>` already has a child `div#book-columns` that has a child
 
 ## The style rule
 
-Appended as the last child of `<head>`:
+Appended as the last child of `<head>`. The rule is kepubify 4.0.4's,
+byte for byte; the element around it follows the EPUB version, because the
+two versions allow different attributes on `<style>`:
 
 ```html
-<style type="text/css" class="kobostylehacks">div#book-inner { margin-top: 0; margin-bottom: 0;}</style>
+<!-- EPUB 3 -->
+<style class="kobostylehacks">div#book-inner { margin-top: 0; margin-bottom: 0;}</style>
+<!-- EPUB 2 -->
+<style type="text/css">div#book-inner { margin-top: 0; margin-bottom: 0;}</style>
 ```
 
-This text is byte-identical to kepubify 4.0.4's. epubveri 0.21.0 accepts it
-in EPUB 2 and EPUB 3 documents alike.
+- **EPUB 3** (HTML): `type` on `<style>` is obsolete, and epubcheck reports
+  it as a usage finding (RSC-036), once per document. It is left out.
+- **EPUB 2** (XHTML 1.1): `type` is required and `class` is not allowed on
+  `<style>`; either one wrong is an error (RSC-005). So the element has
+  `type` and no marker class.
 
-It is not appended when `<head>` already has an element whose `class`
-includes `kobostylehacks`. A document kepubify converted earlier but that has
-no `koboSpan` (no text at all) would otherwise get the rule twice, which is
-what kepubify itself does.
+kepubify writes `<style type="text/css" class="kobostylehacks">` in both
+versions, which is an error in every EPUB 2 document and a usage finding in
+every EPUB 3 one. kepubverto 0.1.0 wrote the same element; 0.1.1 fixed it.
+
+The rule is not appended when `<head>` already has an element whose `class`
+includes `kobostylehacks` (kepubify's, or ours in EPUB 3), or a `<style>`
+whose text is exactly the rule (ours in EPUB 2, which has no marker). A
+document converted earlier but that has no `koboSpan` (no text at all) would
+otherwise get the rule twice, which is what kepubify itself does.
 
 ## How "never make a book worse" is kept
 
@@ -250,20 +263,25 @@ conversion is built and tested, not on a check at run time:
   place where a `span` would be invalid, and any document where an added id
   would collide. A document that cannot be read is left as it was.
 - **On every commit.** CI converts a fixture set (public-domain books and
-  synthetic edge cases) and grades input and output with epubveri. A valid
-  input that produces an invalid output fails the build.
+  synthetic edge cases) and grades input and output with epubveri. Any
+  finding the output has and the input did not, at any severity, fails the
+  build.
 - **Before every release.** The whole test shelf (544 real books) is
-  converted, and the findings the conversion added must be zero.
+  converted, and the findings the conversion added must be zero, at every
+  severity, usage included: a reader sees the total.
 
 A defect found that way is fixed in the rules, for every book, never patched
 around in one. The rule in
 [Where a span would be invalid](#where-a-span-would-be-invalid) came from
 the first such run.
 
-The last run (2026-10-09), all 544 shelf books, kepubify 4.0.4 as the oracle:
+The last run (2026-10-12, for 0.1.1), all 544 shelf books, kepubify 4.0.4
+as the oracle:
 
-- **Findings added by the conversion: 0** (epubveri 0.24.0, errors and
-  fatals, before and after).
+- **Findings added by the conversion: 0** (epubveri 0.25.0, every severity,
+  usage included, before and after). The 0.1.0 run counted errors and fatals
+  only, with epubveri 0.24.0, which did not see the EPUB 2 `<style>` error
+  described in [The style rule](#the-style-rule).
 - **Spans identical to kepubify's in 525 books.** In the other 19, every
   difference is one of: markup an HTML parser rebuilds, a block element inside
   a `p` or a self-closed non-void element, where kepubify misreads the

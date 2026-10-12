@@ -64,7 +64,12 @@ fn raw_entry(epub: &[u8], name: &str) -> (CompressionMethod, Vec<u8>) {
     (f.compression(), v)
 }
 
-const STYLE: &str = r#"<style type="text/css" class="kobostylehacks">div#book-inner { margin-top: 0; margin-bottom: 0;}</style>"#;
+const STYLE: &str =
+    r#"<style class="kobostylehacks">div#book-inner { margin-top: 0; margin-bottom: 0;}</style>"#;
+const STYLE_EPUB2: &str =
+    r#"<style type="text/css">div#book-inner { margin-top: 0; margin-bottom: 0;}</style>"#;
+/// What kepubify 4.0.4 appends, in EPUB 2 and EPUB 3 alike.
+const KEPUBIFY_STYLE: &str = r#"<style type="text/css" class="kobostylehacks">div#book-inner { margin-top: 0; margin-bottom: 0;}</style>"#;
 
 #[test]
 fn converts_a_document_and_keeps_every_other_byte() {
@@ -126,6 +131,32 @@ fn converting_twice_changes_nothing() {
 }
 
 #[test]
+fn the_style_element_follows_the_epub_version() {
+    let c = convert(&book(true, &[&page(EPUB3_HEAD, "<p>x</p>")])).unwrap();
+    let out = entry(&c.epub, "OEBPS/Text/c0.xhtml");
+    assert!(out.contains(&format!("{STYLE}</head>")), "{out}");
+    assert!(!out.contains("type=\"text/css\""), "{out}");
+
+    let c = convert(&book(false, &[&page(EPUB2_HEAD, "<p>x</p>")])).unwrap();
+    let out = entry(&c.epub, "OEBPS/Text/c0.xhtml");
+    assert!(out.contains(&format!("{STYLE_EPUB2}</head>")), "{out}");
+    assert!(!out.contains("kobostylehacks"), "{out}");
+}
+
+#[test]
+fn the_unmarked_epub2_style_is_not_added_again() {
+    // No text, so no span marks the document as converted: only the rule
+    // text itself shows that the style is already there.
+    let head = EPUB2_HEAD.replace("</head>", &format!("{STYLE_EPUB2}</head>"));
+    let doc = page(
+        &head,
+        r#"<div id="book-columns"><div id="book-inner"><hr/></div></div>"#,
+    );
+    let c = convert(&book(false, &[&doc])).unwrap();
+    assert_eq!(c.documents[0].outcome, Outcome::NothingToDo);
+}
+
+#[test]
 fn epub2_named_entities_parse_and_are_kept() {
     let doc = page(EPUB2_HEAD, "<p>a&nbsp;b. c&rsquo;s. d</p>");
     let c = convert(&book(false, &[&doc])).unwrap();
@@ -176,7 +207,7 @@ fn an_id_the_conversion_would_add_leaves_the_document_alone() {
 
 #[test]
 fn existing_divs_and_style_are_not_added_again() {
-    let head = EPUB3_HEAD.replace("</head>", &format!("{STYLE}</head>"));
+    let head = EPUB3_HEAD.replace("</head>", &format!("{KEPUBIFY_STYLE}</head>"));
     let doc = page(
         &head,
         r#"<div id="book-columns"><div id="book-inner"><p>x</p></div></div>"#,

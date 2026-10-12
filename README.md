@@ -39,6 +39,9 @@ a reader does not always show:
   directly in an EPUB 2 `<blockquote>`). On the test shelf this added 3,994
   validation errors to two books.
 - A book converted twice gets the style rule twice.
+- Its style element is invalid in every EPUB 2 document (`class` is not
+  allowed on an XHTML 1.1 `<style>`), and in EPUB 3 it carries an obsolete
+  `type`.
 - DOCTYPEs, entity references, line endings and whitespace are rewritten.
 
 kepubverto reads documents as XML, as the EPUB specification requires, and

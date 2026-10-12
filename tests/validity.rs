@@ -93,27 +93,23 @@ fn book(epub3: bool) -> Vec<u8> {
     z.finish().unwrap().into_inner()
 }
 
-fn problems(epub: &[u8]) -> Vec<String> {
+/// Every finding, at every severity down to usage: a user reads the total, so
+/// a usage finding the conversion adds is a book made worse too.
+fn findings(epub: &[u8]) -> Vec<String> {
     let report = epubveri::validate_bytes(epub.to_vec());
     report
         .messages
         .iter()
-        .filter(|m| {
-            matches!(
-                m.severity,
-                epubveri::report::Severity::Error | epubveri::report::Severity::Fatal
-            )
-        })
-        .map(|m| format!("{} {} [{:?}]", m.id, m.text, m.location))
+        .map(|m| format!("{} {:?} {} [{:?}]", m.id, m.severity, m.text, m.location))
         .collect()
 }
 
 fn stays_valid(epub3: bool) {
     let input = book(epub3);
     assert_eq!(
-        problems(&input),
+        findings(&input),
         Vec::<String>::new(),
-        "the fixture itself must be valid"
+        "the fixture itself must have no finding"
     );
     let c = kepubverto::convert(&input).unwrap();
     assert!(c.complete());
@@ -122,7 +118,7 @@ fn stays_valid(epub3: bool) {
         "the fixture exercises the rules ({} spans)",
         c.spans()
     );
-    assert_eq!(problems(&c.epub), Vec::<String>::new());
+    assert_eq!(findings(&c.epub), Vec::<String>::new());
 }
 
 #[test]

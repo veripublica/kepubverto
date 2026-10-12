@@ -12,8 +12,16 @@ use crate::segment;
 
 const XHTML_NS: &str = "http://www.w3.org/1999/xhtml";
 
-/// The element appended to `<head>`, byte-identical to kepubify 4.0.4's.
-pub const STYLE: &str = r#"<style type="text/css" class="kobostylehacks">div#book-inner { margin-top: 0; margin-bottom: 0;}</style>"#;
+/// The rule appended to `<head>`, byte-identical to kepubify 4.0.4's.
+pub const STYLE_RULE: &str = "div#book-inner { margin-top: 0; margin-bottom: 0;}";
+/// The element that carries it in EPUB 3. HTML calls `type` on `<style>`
+/// obsolete (RSC-036), so it is left out.
+pub const STYLE_EPUB3: &str =
+    r#"<style class="kobostylehacks">div#book-inner { margin-top: 0; margin-bottom: 0;}</style>"#;
+/// The element that carries it in EPUB 2. XHTML 1.1 requires `type` on
+/// `<style>` and allows no `class` there (RSC-005), so it has no marker.
+pub const STYLE_EPUB2: &str =
+    r#"<style type="text/css">div#book-inner { margin-top: 0; margin-bottom: 0;}</style>"#;
 const DIVS_OPEN: &str = r#"<div id="book-columns"><div id="book-inner">"#;
 const DIVS_CLOSE: &str = "</div></div>";
 
@@ -153,10 +161,11 @@ fn convert_text(bytes: &[u8], epub3: bool) -> Result<Option<(String, usize)>, St
         }
     }
     if let Some(head) = head
-        && !head.descendants().any(|n| has_class(n, "kobostylehacks"))
+        && !head.descendants().any(is_style_rule)
         && let Some(content) = content_range(&text, head.range())
     {
-        w.edits.push(Edit::new(content.end, Order::Last, STYLE));
+        let style = if epub3 { STYLE_EPUB3 } else { STYLE_EPUB2 };
+        w.edits.push(Edit::new(content.end, Order::Last, style));
     }
 
     if w.edits.is_empty() {
@@ -412,6 +421,13 @@ fn attr<'a>(n: Node<'a, '_>, name: &str) -> Option<&'a str> {
 
 fn has_class(n: Node, token: &str) -> bool {
     attr(n, "class").is_some_and(|c| c.split_ascii_whitespace().any(|t| t == token))
+}
+
+/// The style rule is already there: kepubify's marker class, or, since the
+/// EPUB 2 element has no marker, a `<style>` holding exactly the rule.
+fn is_style_rule(n: Node) -> bool {
+    has_class(n, "kobostylehacks")
+        || (is_xhtml(n, "style") && n.text().is_some_and(|t| t.trim() == STYLE_RULE))
 }
 
 fn is_div_with_id(n: Node, id: &str) -> bool {
