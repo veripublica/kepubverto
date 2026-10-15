@@ -14,7 +14,7 @@ conversion is still valid after it.
 ## Status
 
 Early but working: the conversion is tested on a 562-book shelf and on a
-real Kobo. `--format json` is still to come.
+real Kobo. `--format json` gives the family's machine-readable report.
 
 What the conversion does is written down in [docs/SPANS.md](docs/SPANS.md),
 rule by rule. In short, in each XHTML content document it:
@@ -107,12 +107,52 @@ kepubverto converts; it does not validate. To check a book first, run
 
 Exit codes: `0` every content document was converted; `1` the book was
 written, but some documents could not be converted and were left as they
-were (each is named on stderr); `2` kepubverto could not run.
+were (each is named on stderr, or as a finding in the JSON report); `2`
+kepubverto could not run.
 
 The CLI conforms to the [veripublica conventions
-v0.6](https://github.com/veripublica/conventions): input by `-i` only, never
+v0.7](https://github.com/veripublica/conventions): input by `-i` only, never
 a positional path; output never in place; an existing file is replaced only
 with `-f`.
+
+### Machine-readable output
+
+`--format json` prints one JSON object on stdout instead of the human
+report: the family's shared envelope
+([FORMATS](https://github.com/veripublica/conventions/blob/main/FORMATS.md)),
+with `output` naming the book written. The input's `summary` counts the
+content documents by outcome:
+
+```json
+"summary": { "documents": 12, "converted": 11, "already_converted": 0,
+             "nothing_to_do": 0, "left_alone": 1, "spans": 4210 }
+```
+
+Each document left as it was is one `finding` item, with its path as
+`location` and the reason as `message`. Its `code` is epubcheck's where
+epubcheck grades the same state as an error or worse, and kepubverto's own
+otherwise; a document left alone is always at least an error, so the input
+is `problems` and the exit code `1`:
+
+| The document | `code` | `severity` |
+|---|---|---|
+| is not well-formed XML | `RSC-016` | fatal |
+| has no XHTML `<body>` | `RSC-005` | error |
+| is named in the manifest but missing from the container | `RSC-001` | error |
+| is UTF-16 (`application/xhtml+xml`) | `HTM_058` | error |
+| is UTF-16 (`text/html`, which epubcheck grades only as a warning) | `KEPUB-006` | error |
+| is in UCS-4, EBCDIC or another declared encoding | `RSC-028` | error |
+| … declared under a name epubcheck's XML parser does not take | `RSC-016` | fatal |
+| is not UTF-8, and declares no other encoding | `KEPUB-001` | error |
+| is past the XML safety limits | `KEPUB-002` | error |
+| already uses an id the conversion would add | `KEPUB-003` | error |
+| declares an entity that expands to markup | `KEPUB-004` | error |
+| cannot be read out of the container | `KEPUB-005` | error |
+
+A book that cannot be read, or written after converting, is an input with
+`status: "error"` and exit `2`. A refusal (the output is the input, or
+exists without `-f`) and a usage error print no envelope, only a line on
+stderr.
 
 ### Coming from kepubify
 

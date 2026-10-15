@@ -15,6 +15,12 @@ fn page(head: &str, body: &str) -> String {
 
 /// A book with one content document per entry of `docs`, plus a stylesheet.
 fn book(epub3: bool, docs: &[&str]) -> Vec<u8> {
+    let docs: Vec<&[u8]> = docs.iter().map(|d| d.as_bytes()).collect();
+    book_bytes(epub3, &docs)
+}
+
+/// [`book`], with documents given as bytes (for encodings other than UTF-8).
+fn book_bytes(epub3: bool, docs: &[&[u8]]) -> Vec<u8> {
     let items: String = (0..docs.len())
         .map(|i| {
             format!(
@@ -43,7 +49,7 @@ fn book(epub3: bool, docs: &[&str]) -> Vec<u8> {
     for (i, d) in docs.iter().enumerate() {
         z.start_file(format!("OEBPS/Text/c{i}.xhtml"), deflated)
             .unwrap();
-        z.write_all(d.as_bytes()).unwrap();
+        z.write_all(d).unwrap();
     }
     z.finish().unwrap().into_inner()
 }
@@ -409,6 +415,104 @@ fn svg_and_mathml_names_keep_their_case_in_text_html_items() {
     let out = entry(&c.epub, "OEBPS/Text/c0.xhtml");
     assert!(out.contains(svg), "{out}");
     assert!(out.contains(math), "{out}");
+}
+
+/// The reason a document is left alone for, and the code `--format json`
+/// gives it (FORMATS §1.3: epubcheck's ID where it grades the state at
+/// `error` or above, a `KEPUB-` code otherwise).
+fn left_alone(doc: &[u8], text_html: bool) -> (Reason, &'static str, &'static str) {
+    let mut input = book_bytes(true, &[doc]);
+    if text_html {
+        input = as_text_html(&input);
+    }
+    let c = convert(&input).unwrap();
+    let d = &c.documents[0];
+    let Outcome::LeftAlone(reason) = &d.outcome else {
+        panic!("converted: {:?}", d.outcome);
+    };
+    let (code, severity) = reason.code(&d.media_type);
+    (reason.clone(), code, severity.as_str())
+}
+
+fn utf16le(text: &str, bom: bool) -> Vec<u8> {
+    let mut v = if bom { vec![0xFF, 0xFE] } else { Vec::new() };
+    v.extend(text.encode_utf16().flat_map(u16::to_le_bytes));
+    v
+}
+
+#[test]
+fn utf16_is_htm_058_in_xhtml_and_ours_in_text_html() {
+    let doc = page(EPUB3_HEAD, "<p>x</p>").replace("utf-8", "UTF-16");
+    for bom in [true, false] {
+        let (r, code, sev) = left_alone(&utf16le(&doc, bom), false);
+        assert_eq!((r, code, sev), (Reason::Utf16, "HTM_058", "error"));
+        // epubcheck grades UTF-16 outside application/xhtml+xml as a
+        // warning (RSC-027), below what a part left untouched must carry.
+        let (r, code, sev) = left_alone(&utf16le(&doc, bom), true);
+        assert_eq!((r, code, sev), (Reason::Utf16, "KEPUB-006", "error"));
+    }
+}
+
+#[test]
+fn another_declared_encoding_is_rsc_028_or_rsc_016() {
+    let latin1 = |name: &str| {
+        let mut v = page(EPUB3_HEAD, "<p>caf_</p>")
+            .replace("utf-8", name)
+            .into_bytes();
+        let i = v.iter().position(|&b| b == b'_').unwrap();
+        v[i] = 0xE9; // é in ISO-8859-1, not UTF-8
+        v
+    };
+    let (r, code, sev) = left_alone(&latin1("ISO-8859-1"), false);
+    assert_eq!(
+        r,
+        Reason::Encoding {
+            name: "ISO-8859-1".into(),
+            parser_accepts: true
+        }
+    );
+    assert_eq!((code, sev), ("RSC-028", "error"));
+    // A name epubcheck's parser does not take stops it at the declaration.
+    let (r, code, sev) = left_alone(&latin1("SJIS"), false);
+    assert!(matches!(
+        r,
+        Reason::Encoding {
+            parser_accepts: false,
+            ..
+        }
+    ));
+    assert_eq!((code, sev), ("RSC-016", "fatal"));
+}
+
+#[test]
+fn a_declared_encoding_over_utf8_bytes_is_still_converted() {
+    // ASCII is the same bytes in both; this is what 0.1 did, and still does.
+    let doc = page(EPUB3_HEAD, "<p>x</p>").replace("utf-8", "ISO-8859-1");
+    let c = convert(&book(true, &[&doc])).unwrap();
+    assert_eq!(c.documents[0].outcome, Outcome::Converted { spans: 1 });
+}
+
+#[test]
+fn every_other_reason_has_its_code() {
+    let (_, code, sev) = left_alone(b"\xC3(not utf-8 <p>x</p>", false);
+    assert_eq!((code, sev), ("KEPUB-001", "error"));
+    let (_, code, sev) = left_alone(page(EPUB3_HEAD, "<p>open").as_bytes(), false);
+    assert_eq!((code, sev), ("RSC-016", "fatal"));
+    let no_body = "<?xml version=\"1.0\"?><html xmlns=\"http://www.w3.org/1999/xhtml\"><head><title>T</title></head></html>";
+    let (_, code, sev) = left_alone(no_body.as_bytes(), false);
+    assert_eq!((code, sev), ("RSC-005", "error"));
+    let taken = page(EPUB3_HEAD, r#"<p id="kobo.1.1">x</p>"#);
+    let (_, code, sev) = left_alone(taken.as_bytes(), false);
+    assert_eq!((code, sev), ("KEPUB-003", "error"));
+    assert_eq!(Reason::Missing.code("application/xhtml+xml").0, "RSC-001");
+    for (r, want) in [
+        (Reason::TooLarge("x".into()), "KEPUB-002"),
+        (Reason::MarkupInEntity, "KEPUB-004"),
+        (Reason::Unreadable("x".into()), "KEPUB-005"),
+    ] {
+        let (code, sev) = r.code("application/xhtml+xml");
+        assert_eq!((code, sev.as_str()), (want, "error"));
+    }
 }
 
 #[test]

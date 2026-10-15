@@ -33,6 +33,16 @@ pub struct Document {
     #[tsify(optional)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reason: Option<String>,
+    /// For a document left alone: the code the CLI's `--format json` gives
+    /// it (`"RSC-016"`, `"KEPUB-003"`, …), epubcheck's where it has one.
+    #[tsify(optional)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub code: Option<String>,
+    /// For a document left alone: that code's severity, `"fatal"` or
+    /// `"error"`.
+    #[tsify(optional)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub severity: Option<String>,
 }
 
 #[derive(Serialize, Tsify)]
@@ -73,13 +83,16 @@ pub fn convert(epub: &[u8], hyphens: Option<String>) -> Result<Conversion, JsErr
                 kepubverto::Outcome::Converted { spans } => ("converted", spans, None),
                 kepubverto::Outcome::AlreadyConverted => ("already_converted", 0, None),
                 kepubverto::Outcome::NothingToDo => ("nothing_to_do", 0, None),
-                kepubverto::Outcome::LeftAlone(r) => ("left_alone", 0, Some(r.to_string())),
+                kepubverto::Outcome::LeftAlone(r) => ("left_alone", 0, Some(r)),
             };
+            let code = reason.as_ref().map(|r| r.code(&d.media_type));
             Document {
                 path: d.path,
                 outcome: outcome.to_string(),
                 spans,
-                reason,
+                reason: reason.map(|r| r.to_string()),
+                code: code.map(|(c, _)| c.to_string()),
+                severity: code.map(|(_, s)| s.as_str().to_string()),
             }
         })
         .collect();

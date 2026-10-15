@@ -23,9 +23,11 @@ await init();
 const r = convert(new Uint8Array(await file.arrayBuffer()));
 // r.epub:      Uint8Array, the converted book → save as <name>.kepub.epub
 // r.complete:  every content document was converted
-// r.documents: [{ path, outcome, spans, reason? }]
+// r.documents: [{ path, outcome, spans, reason?, code?, severity? }]
 //   outcome: "converted" | "already_converted" | "nothing_to_do" | "left_alone"
 //   reason:  why a document was left as it was, for a person to read
+//   code, severity: for a document left as it was, the code and severity
+//            the CLI's --format json gives it ("RSC-016" / "fatal", …)
 
 // The CLI's --hyphens: "auto" turns hyphenation on, "none" off.
 convert(bytes, "auto");

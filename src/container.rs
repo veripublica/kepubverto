@@ -116,9 +116,9 @@ impl<'a> Container<'a> {
 /// What the package document says about the content documents.
 pub struct Package {
     pub epub3: bool,
-    /// Container paths of the content documents (`application/xhtml+xml`,
-    /// and `text/html`), in manifest order.
-    pub documents: Vec<String>,
+    /// The content documents (`application/xhtml+xml`, and `text/html`), in
+    /// manifest order: container path and media type as the manifest gives it.
+    pub documents: Vec<(String, String)>,
 }
 
 /// Find the package document through `META-INF/container.xml` and read its
@@ -149,26 +149,24 @@ pub fn package(c: &mut Container) -> Result<Package, Error> {
         .is_some_and(|v| v.trim().starts_with('3'));
     let base = rootfile.rsplit_once('/').map_or("", |(dir, _)| dir);
 
-    let mut documents: Vec<String> = Vec::new();
+    let mut documents: Vec<(String, String)> = Vec::new();
     for item in root.descendants().filter(|n| {
         n.has_tag_name("item") && n.parent().is_some_and(|p| p.has_tag_name("manifest"))
     }) {
         // `text/html` is not a content-document type in either EPUB version,
         // but kepubify converts such items, and so do we when they parse as
         // XML, so that their ids match (docs/SPANS.md).
-        let is_content = item.attribute("media-type").is_some_and(|m| {
-            let m = m.trim();
+        let Some(media_type) = item.attribute("media-type").map(str::trim).filter(|m| {
             m.eq_ignore_ascii_case("application/xhtml+xml") || m.eq_ignore_ascii_case("text/html")
-        });
-        if !is_content {
+        }) else {
             continue;
-        }
+        };
         let Some(href) = item.attribute("href") else {
             continue;
         };
         let path = resolve(base, &percent_decode(href));
-        if !documents.contains(&path) {
-            documents.push(path);
+        if !documents.iter().any(|(p, _)| *p == path) {
+            documents.push((path, media_type.to_ascii_lowercase()));
         }
     }
     Ok(Package { epub3, documents })

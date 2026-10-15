@@ -1,4 +1,4 @@
-//! kepubverto's CLI, following the **veripublica CLI convention v0.6**
+//! kepubverto's CLI, following the **veripublica CLI convention v0.7**
 //! (<https://github.com/veripublica/conventions>).
 //!
 //! kepubverto is a *transformer*: exactly one input, a converted copy written
@@ -13,7 +13,9 @@
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
+use epubveri::envelope::{Envelope, Input, Item};
 use kepubverto::{Conversion, Hyphens, Options, Outcome};
+use serde::Serialize;
 
 const HELP: &str = "\
 kepubverto — convert an EPUB to a KEPUB for Kobo e-readers
@@ -34,7 +36,9 @@ OPTIONS:
                             headings, table cells and the book's own
                             per-element choices alone; none overrides the
                             book. Without it, the book decides.
-        --format <FORMAT>   Report format: human (the default).
+        --format <FORMAT>   Report format: human (the default), or json: the
+                            shared machine envelope (one JSON object on stdout,
+                            see the veripublica FORMATS spec).
     -V, --version           Print kepubverto <version> to stdout and exit 0.
     -h, --help              Print this help to stdout and exit 0.
 
@@ -53,9 +57,15 @@ EXIT CODES:
         converted and were left as they were; each is named on stderr.
     2   kepubverto could not run: a usage error, an unreadable EPUB, an output
         path that is the input, an existing output file without -f, or an I/O
-        failure.
+        failure. With --format json, an EPUB that cannot be read or a book that
+        cannot be written is still described in the envelope; the rest print
+        no envelope.
 
-Conforms to veripublica conventions v0.6.";
+Conforms to veripublica conventions v0.7.";
+
+/// The convention version this CLI and its envelope implement (FORMATS §1.1):
+/// asserted here, never inherited from epubveri.
+const CONVENTION: &str = "0.7";
 
 /// The outcome of parsing `argv`, decided entirely before any work is done.
 #[derive(Debug, PartialEq)]
@@ -76,6 +86,7 @@ struct Run {
     output: Option<String>,
     force: bool,
     hyphens: Option<Hyphens>,
+    json: bool,
 }
 
 /// Parse the arguments after the program name into a [`Cli`] decision.
@@ -196,13 +207,15 @@ fn parse(args: &[String]) -> Cli {
     }
 
     // Reject an out-of-set value (§3.5) after the scan, so a `-h` anywhere
-    // still short-circuits to help. `json` is reserved but not implemented
-    // yet, and a reserved name that is not supported is rejected.
-    if let Some(f) = &format
-        && f != "human"
-    {
-        fail!("invalid value '{f}' for --format; supported values: human");
-    }
+    // still short-circuits to help.
+    let json = match format.as_deref() {
+        None | Some("human") => false,
+        Some("json") => true,
+        Some(f) => {
+            fail!("invalid value '{f}' for --format; supported values: human, json");
+            false
+        }
+    };
     let hyphens = match hyphens.as_deref() {
         None => None,
         Some("auto") => Some(Hyphens::Auto),
@@ -233,6 +246,7 @@ fn parse(args: &[String]) -> Cli {
             output,
             force,
             hyphens,
+            json,
         }),
         n => Cli::Usage(format!(
             "kepubverto converts one book at a time: expected 1 input, got {n}"
@@ -258,48 +272,72 @@ fn main() -> ExitCode {
         }
         Cli::Run(run) => match execute(&run) {
             Ok(code) => code,
-            Err(e) => {
+            Err(Stop::Refused(e)) => {
                 eprintln!("error: {e}");
+                ExitCode::from(2)
+            }
+            Err(Stop::Input(e)) => {
+                eprintln!("error: {e}");
+                if run.json {
+                    print_envelope(input_error(run.input.clone(), e));
+                }
                 ExitCode::from(2)
             }
         },
     }
 }
 
+/// Why a run stopped with exit `2` (FORMATS §1, as epubsana splits it).
+enum Stop {
+    /// The tool would not run: output = input, an existing output without
+    /// `-f`. No envelope.
+    Refused(String),
+    /// The input could not be processed: unreadable, not an EPUB, or the
+    /// converted book could not be written. Described in the envelope.
+    Input(String),
+}
+
 /// Convert the one input, report, and return the exit code. Anything that
 /// stops the run from writing a book is an `Err`: exit `2`.
-fn execute(run: &Run) -> Result<ExitCode, String> {
+fn execute(run: &Run) -> Result<ExitCode, Stop> {
     let input = Path::new(&run.input);
     // Resolve the output and enforce the file-safety rules before any work.
     let out = match &run.output {
         Some(o) => PathBuf::from(o),
         None => default_output(input),
     };
-    let bytes =
-        std::fs::read(input).map_err(|e| format!("cannot read {}: {e}", input.display()))?;
+    let bytes = std::fs::read(input)
+        .map_err(|e| Stop::Input(format!("cannot read {}: {e}", input.display())))?;
     if same_path(input, &out) {
-        return Err(format!(
+        return Err(Stop::Refused(format!(
             "output path is the input ({}); refusing to modify the original in place \
              — choose a different -o (-f does not lift this)",
             out.display()
-        ));
+        )));
     }
     if out.exists() && !run.force {
-        return Err(format!("'{}' exists; use -f to replace it", out.display()));
+        return Err(Stop::Refused(format!(
+            "'{}' exists; use -f to replace it",
+            out.display()
+        )));
     }
 
     let options = Options {
         hyphens: run.hyphens,
     };
     let conversion = kepubverto::convert_with(&bytes, &options)
-        .map_err(|e| format!("cannot convert {}: {e}", run.input))?;
+        .map_err(|e| Stop::Input(format!("cannot convert {}: {e}", run.input)))?;
     std::fs::write(&out, &conversion.epub)
-        .map_err(|e| format!("cannot write {}: {e}", out.display()))?;
+        .map_err(|e| Stop::Input(format!("cannot write {}: {e}", out.display())))?;
 
-    for (path, reason) in conversion.left_alone() {
-        eprintln!("warning: {path} was left as it was: {reason}");
+    if run.json {
+        print_envelope(input_converted(&conversion, &run.input, &out));
+    } else {
+        for (path, reason) in conversion.left_alone() {
+            eprintln!("warning: {path} was left as it was: {reason}");
+        }
+        print_report(&conversion, &run.input, &out);
     }
-    print_report(&conversion, &run.input, &out);
     Ok(if conversion.complete() {
         ExitCode::SUCCESS
     } else {
@@ -325,6 +363,90 @@ fn print_report(c: &Conversion, input: &str, out: &Path) {
     }
     println!("{line}");
     println!("wrote {}", out.display());
+}
+
+/// kepubverto's per-input `summary` (FORMATS §2, tool-owned): how many
+/// content documents came to each outcome, and the spans added. No severity
+/// counters: the items are findings only, and their severities are in them.
+#[derive(Serialize)]
+struct Summary {
+    documents: usize,
+    converted: usize,
+    already_converted: usize,
+    nothing_to_do: usize,
+    left_alone: usize,
+    spans: usize,
+}
+
+/// No tool-owned item `data` yet.
+type Data = ();
+
+/// The input object for a converted book: one `finding` per content document
+/// left as it was (FORMATS §1.3, "A part a transformer leaves untouched"),
+/// at the code and severity [`kepubverto::Reason::code`] gives.
+fn input_converted(c: &Conversion, input: &str, out: &Path) -> Input<Summary, Data> {
+    let count = |f: fn(&Outcome) -> bool| c.documents.iter().filter(|d| f(&d.outcome)).count();
+    let summary = Summary {
+        documents: c.documents.len(),
+        converted: count(|o| matches!(o, Outcome::Converted { .. })),
+        already_converted: count(|o| matches!(o, Outcome::AlreadyConverted)),
+        nothing_to_do: count(|o| matches!(o, Outcome::NothingToDo)),
+        left_alone: count(|o| matches!(o, Outcome::LeftAlone(_))),
+        spans: c.spans(),
+    };
+    let items = c
+        .documents
+        .iter()
+        .filter_map(|d| match &d.outcome {
+            Outcome::LeftAlone(reason) => {
+                let (code, severity) = reason.code(&d.media_type);
+                Some(Item::finding(
+                    code.to_string(),
+                    None,
+                    severity.as_str(),
+                    Some(d.path.clone()),
+                    None,
+                    format!("Left as it was: {reason}"),
+                    None,
+                ))
+            }
+            _ => None,
+        })
+        .collect();
+    Input::transformed(
+        input.to_string(),
+        out.display().to_string(),
+        Some(summary),
+        items,
+    )
+}
+
+/// The input object for a book that could not be read or written: no
+/// verdict, so no summary (FORMATS §1.2, §1.4).
+fn input_error(path: String, error: String) -> Input<Summary, Data> {
+    Input {
+        path,
+        status: "error",
+        error: Some(error),
+        output: None,
+        summary: None,
+        items: Vec::new(),
+    }
+}
+
+fn print_envelope(input: Input<Summary, Data>) {
+    let env = Envelope::for_tool(
+        "kepubverto",
+        kepubverto::VERSION,
+        CONVENTION,
+        None,
+        vec![input],
+    );
+    // Serializing owned strings and integers cannot fail.
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&env).expect("the envelope serializes")
+    );
 }
 
 /// Default output: `<input-stem>.kepub.epub`, beside the input (§4: an
@@ -444,12 +566,14 @@ mod tests {
     }
 
     #[test]
-    fn json_is_reserved_and_rejected_until_implemented() {
+    fn format_takes_human_and_json() {
+        assert!(!run_of(&["-i", "a.epub"]).json);
+        assert!(!run_of(&["-i", "a.epub", "--format=human"]).json);
+        assert!(run_of(&["-i", "a.epub", "--format", "json"]).json);
         assert_eq!(
-            parse_str(&["-i", "a.epub", "--format", "json"]),
-            Cli::Usage("invalid value 'json' for --format; supported values: human".into())
+            parse_str(&["-i", "a.epub", "--format", "JSON"]),
+            Cli::Usage("invalid value 'JSON' for --format; supported values: human, json".into())
         );
-        assert_eq!(run_of(&["-i", "a.epub", "--format=human"]).input, "a.epub");
     }
 
     #[test]

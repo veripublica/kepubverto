@@ -26,7 +26,7 @@ mod segment;
 
 use std::collections::BTreeMap;
 
-pub use content::{Hyphens, Outcome, Reason};
+pub use content::{Hyphens, Outcome, Reason, codes};
 
 /// The crate version, with `+<git hash>[.dirty]` when built from a checkout.
 pub const VERSION: &str = concat!(env!("CARGO_PKG_VERSION"), env!("KEPUBVERTO_BUILD"));
@@ -71,6 +71,9 @@ pub struct Conversion {
 pub struct Document {
     /// The path inside the container.
     pub path: String,
+    /// The manifest's media type, lowercased: `application/xhtml+xml` or
+    /// `text/html`. [`Reason::code`] takes it.
+    pub media_type: String,
     pub outcome: Outcome,
 }
 
@@ -132,7 +135,7 @@ pub fn convert_with(epub: &[u8], options: &Options) -> Result<Conversion, Error>
     let package = container::package(&mut c)?;
     let mut changed = BTreeMap::new();
     let mut documents = Vec::with_capacity(package.documents.len());
-    for path in package.documents {
+    for (path, media_type) in package.documents {
         let outcome = if !c.has(&path) {
             Outcome::LeftAlone(Reason::Missing)
         } else {
@@ -149,7 +152,11 @@ pub fn convert_with(epub: &[u8], options: &Options) -> Result<Conversion, Error>
                 Err(e) => return Err(e),
             }
         };
-        documents.push(Document { path, outcome });
+        documents.push(Document {
+            path,
+            media_type,
+            outcome,
+        });
     }
     let epub = c.write(&changed)?;
     Ok(Conversion { epub, documents })

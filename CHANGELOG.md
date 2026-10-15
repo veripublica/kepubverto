@@ -24,12 +24,28 @@ rules](https://doc.rust-lang.org/cargo/reference/semver.html).
   hyphenation setting as a third argument.
 - Web page and `kepubverto-wasm`: a hyphenation choice, and
   `convert(epub, hyphens?)`.
+- `--format json`: the family's shared envelope (FORMATS, conventions
+  v0.7), with `output`, a per-input `summary` of the documents by outcome,
+  and one `finding` per document left as it was, coded as epubcheck codes
+  the same state where it grades it an error or worse, `KEPUB-001` to
+  `KEPUB-006` otherwise (README, "Machine-readable output"). An EPUB that
+  cannot be read, or a book that cannot be written, is an `error` input; a
+  refusal or a usage error prints no envelope.
+- Library: `Reason::code(media_type)` gives that code and severity;
+  `Document::media_type`; `Reason::Utf16` and `Reason::Encoding` say which
+  encoding a document left alone for its encoding is in, read with
+  epubveri's `encoding::sniff`. `content::codes` holds the `KEPUB-` codes.
+- `kepubverto-wasm`: a document left as it was carries `code` and
+  `severity`, as in the CLI's `--format json`.
 
 ### Changed
 
 - Requires epubveri 0.28 (its `encoding` module, which classifies a
-  document's encoding the way epubcheck does, and `Input::transformed`:
-  groundwork for `--format json`).
+  document's encoding the way epubcheck does, and `Input::transformed`).
+- Conforms to veripublica conventions v0.7 (was v0.6): `--help` says so, and
+  the envelope's `convention` is `"0.7"`.
+- `Reason::NotUtf8` now means only *not UTF-8, with no sign of another
+  encoding*; the other cases are `Reason::Utf16` and `Reason::Encoding`.
 
 ## [0.1.1] - 2026-10-12
 

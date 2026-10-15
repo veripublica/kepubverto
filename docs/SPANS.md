@@ -71,7 +71,11 @@ EPUB 3 such entities are an error, and the document is not well-formed.
 A content document is **left untouched**, and the report says why, when:
 
 - it is not UTF-8 (every insertion is ASCII, but the sentence rules read
-  characters);
+  characters). When its first bytes or its declaration say which encoding
+  it is in (UTF-16, UCS-4, EBCDIC, or a declared name), the reason names it,
+  classified by epubveri's copy of epubcheck's encoding sniffer. A document
+  that declares another encoding but whose bytes are valid UTF-8 (plain
+  ASCII, for instance) is converted as before;
 - it is not well-formed XML. A character XML 1.0 forbids, such as a form
   feed, makes a document not well-formed, even though an HTML parser, and so
   kepubify, reads past it;

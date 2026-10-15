@@ -6,6 +6,9 @@
 
 use std::ops::Range;
 
+use epubveri::encoding::{self, Sniffed};
+use epubveri::ids;
+use epubveri::report::Severity;
 use roxmltree::{Document, Node, ParsingOptions};
 
 use crate::segment;
@@ -71,8 +74,22 @@ pub enum Outcome {
 /// Why a document was left as it was.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Reason {
-    /// The bytes are not UTF-8.
+    /// The bytes are not UTF-8, and nothing in them says they are meant to be
+    /// anything else.
     NotUtf8,
+    /// It is UTF-16, by its byte order mark, its first bytes or its
+    /// declaration.
+    Utf16,
+    /// It is in another encoding than UTF-8 or UTF-16: UCS-4, EBCDIC, or the
+    /// one its declaration names.
+    Encoding {
+        /// The encoding, as epubcheck names it (`UCS-4`, `EBCDIC`, or the
+        /// declared name upper-cased).
+        name: String,
+        /// Whether epubcheck's XML parser takes that name; if not, epubcheck
+        /// stops at the declaration.
+        parser_accepts: bool,
+    },
     /// The family's XML safety limits refused it before parsing.
     TooLarge(String),
     /// It is not well-formed XML.
@@ -94,6 +111,8 @@ impl std::fmt::Display for Reason {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Reason::NotUtf8 => f.write_str("it is not UTF-8"),
+            Reason::Utf16 => f.write_str("it is UTF-16, not UTF-8"),
+            Reason::Encoding { name, .. } => write!(f, "it is in {name}, not UTF-8"),
             Reason::TooLarge(why) => write!(f, "{why}"),
             Reason::NotWellFormed(why) => write!(f, "it is not well-formed XML: {why}"),
             Reason::NoBody => f.write_str("it has no XHTML <body>"),
@@ -103,6 +122,60 @@ impl std::fmt::Display for Reason {
                 f.write_str("the manifest names it, but the container has no such file")
             }
             Reason::Unreadable(why) => write!(f, "it could not be read: {why}"),
+        }
+    }
+}
+
+/// A code kepubverto owns, for a state no epubcheck ID names at `error` or
+/// above (FORMATS §1.3). The numbers are stable once released.
+pub mod codes {
+    /// Not UTF-8, with no declaration or signature of another encoding.
+    pub const KEPUB_001: &str = "KEPUB-001";
+    /// Past the family's XML safety limits.
+    pub const KEPUB_002: &str = "KEPUB-002";
+    /// An id the conversion would add is already used.
+    pub const KEPUB_003: &str = "KEPUB-003";
+    /// An entity the document declares expands to markup.
+    pub const KEPUB_004: &str = "KEPUB-004";
+    /// The entry cannot be read out of the container.
+    pub const KEPUB_005: &str = "KEPUB-005";
+    /// UTF-16 in an item that is not `application/xhtml+xml`, where
+    /// epubcheck's own grade (RSC-027) is a warning.
+    pub const KEPUB_006: &str = "KEPUB-006";
+}
+
+impl Reason {
+    /// The code and severity a `--format json` finding carries for a document
+    /// left alone for this reason. `media_type` is the manifest's, which
+    /// decides how epubcheck grades UTF-16. epubcheck's ID is used where it
+    /// grades the state at `error` or above; otherwise a `KEPUB-` code
+    /// ([`codes`]), at `error`, because a part left untouched is at least an
+    /// error (FORMATS §1.3).
+    pub fn code(&self, media_type: &str) -> (&'static str, Severity) {
+        let error = |code| (code, Severity::Error);
+        match self {
+            Reason::NotWellFormed(_) => (ids::RSC_016, Severity::Fatal),
+            Reason::NoBody => error(ids::RSC_005),
+            Reason::Missing => error(ids::RSC_001),
+            Reason::Utf16 => match Sniffed::Utf16.finding(media_type) {
+                Some(f @ (_, Severity::Fatal | Severity::Error)) => f,
+                _ => error(codes::KEPUB_006),
+            },
+            Reason::Encoding {
+                parser_accepts: false,
+                ..
+            } => (ids::RSC_016, Severity::Fatal),
+            Reason::Encoding { name, .. } => {
+                match Sniffed::Declared(name.clone()).finding(media_type) {
+                    Some(f @ (_, Severity::Fatal | Severity::Error)) => f,
+                    _ => error(ids::RSC_028),
+                }
+            }
+            Reason::NotUtf8 => error(codes::KEPUB_001),
+            Reason::TooLarge(_) => error(codes::KEPUB_002),
+            Reason::IdInUse(_) => error(codes::KEPUB_003),
+            Reason::MarkupInEntity => error(codes::KEPUB_004),
+            Reason::Unreadable(_) => error(codes::KEPUB_005),
         }
     }
 }
@@ -136,7 +209,20 @@ fn convert_text(
     epub3: bool,
     hyphens: Option<Hyphens>,
 ) -> Result<Option<(String, usize)>, Stop> {
-    let original = std::str::from_utf8(bytes).map_err(|_| Reason::NotUtf8)?;
+    // A document that cannot be read as UTF-8 XML, and whose first bytes say
+    // it is in another encoding, is left alone for its encoding: the sniff is
+    // epubcheck's, so the reason says what epubcheck would.
+    let encoding = || -> Option<Reason> {
+        match encoding::sniff(bytes) {
+            Sniffed::Utf8 => None,
+            Sniffed::Utf16 => Some(Reason::Utf16),
+            other => Some(Reason::Encoding {
+                name: other.name().unwrap_or_default(),
+                parser_accepts: encoding::parser_accepts(bytes),
+            }),
+        }
+    };
+    let original = std::str::from_utf8(bytes).map_err(|_| encoding().unwrap_or(Reason::NotUtf8))?;
     // The XHTML DTD's entities are declared for parsing only. Offsets in the
     // parsed text past the insertion are mapped back by `shift`.
     let (text, shift) = epubveri::htm::declare_dtd_entities(original.to_string(), epub3);
@@ -146,7 +232,7 @@ fn convert_text(
         ..ParsingOptions::default()
     };
     let doc = Document::parse_with_options(&text, opts)
-        .map_err(|e| Reason::NotWellFormed(e.to_string()))?;
+        .map_err(|e| encoding().unwrap_or_else(|| Reason::NotWellFormed(e.to_string())))?;
 
     let root = doc.root_element();
     if !is_xhtml(root, "html") {
