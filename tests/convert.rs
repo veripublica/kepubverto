@@ -321,14 +321,13 @@ fn a_missing_document_is_reported_not_fatal() {
     assert_eq!(c.documents[1].outcome, Outcome::LeftAlone(Reason::Missing));
 }
 
-#[test]
-fn text_html_items_are_converted_like_xhtml() {
-    let input = book(true, &[&page(EPUB3_HEAD, "<p>x</p>")]);
-    let opf = entry(&input, "OEBPS/content.opf").replace(
+/// `input` with every content document declared `text/html`.
+fn as_text_html(input: &[u8]) -> Vec<u8> {
+    let opf = entry(input, "OEBPS/content.opf").replace(
         r#"media-type="application/xhtml+xml""#,
         r#"media-type="text/html""#,
     );
-    let mut src = ZipArchive::new(Cursor::new(input.as_slice())).unwrap();
+    let mut src = ZipArchive::new(Cursor::new(input)).unwrap();
     let mut z = ZipWriter::new(Cursor::new(Vec::new()));
     for i in 0..src.len() {
         let f = src.by_index_raw(i).unwrap();
@@ -341,8 +340,31 @@ fn text_html_items_are_converted_like_xhtml() {
             z.raw_copy_file(f).unwrap();
         }
     }
-    let c = convert(&z.finish().unwrap().into_inner()).unwrap();
+    z.finish().unwrap().into_inner()
+}
+
+#[test]
+fn text_html_items_are_converted_like_xhtml() {
+    let input = as_text_html(&book(true, &[&page(EPUB3_HEAD, "<p>x</p>")]));
+    let c = convert(&input).unwrap();
     assert_eq!(c.documents[0].outcome, Outcome::Converted { spans: 1 });
+}
+
+/// HTML parsing lowercases names; SVG and MathML need their camelCase
+/// (`viewBox`, `linearGradient`, `definitionURL`). A `text/html` item is
+/// read as XML like any other and `svg`/`math` are skipped, so their bytes
+/// come out as they went in.
+#[test]
+fn svg_and_mathml_names_keep_their_case_in_text_html_items() {
+    let svg = r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><defs><linearGradient id="g"><stop offset="0"/></linearGradient><clipPath id="k"><rect width="5" height="5"/></clipPath></defs><text><textPath href="#p">a. b</textPath></text><rect width="10" height="10" fill="url(#g)" clip-path="url(#k)"/></svg>"##;
+    let math = r#"<math xmlns="http://www.w3.org/1998/Math/MathML"><mi definitionURL="http://example.org/x">x</mi></math>"#;
+    let body = format!("<p>Before. It</p>{svg}<p>{math} after. It</p>");
+    let input = as_text_html(&book(true, &[&page(EPUB3_HEAD, &body)]));
+    let c = convert(&input).unwrap();
+    assert_eq!(c.documents[0].outcome, Outcome::Converted { spans: 4 });
+    let out = entry(&c.epub, "OEBPS/Text/c0.xhtml");
+    assert!(out.contains(svg), "{out}");
+    assert!(out.contains(math), "{out}");
 }
 
 #[test]
