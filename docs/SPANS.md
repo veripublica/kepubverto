@@ -27,7 +27,7 @@ parser does not understand a self-closed non-void element such as `<pre/>`
 or `<div/>`. It treats the element as left open, so everything after it moves
 inside it. On a Project Gutenberg book this put the rest of the book inside a
 `<pre>`. The output gained 273 validation errors and lost its spans, because
-`pre` is skipped. 122 of the 544 books on the test shelf contain such an
+`pre` is skipped. 122 of the 544 books on the test shelf (2026-10-05) contain such an
 element. kepubverto reads documents as XML, as the EPUB specification
 requires. The promise is therefore: **ids match kepubify's wherever kepubify
 reads the document correctly.** Where it does not, kepubverto follows the

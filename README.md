@@ -37,7 +37,7 @@ a reader does not always show:
 
 - An element written as `<div/>` or `<pre/>` is valid XHTML, but an HTML
   parser treats it as left open, and the rest of the chapter ends up inside
-  it. 122 of the 544 books on our test shelf contain one.
+  it. 122 of the 544 books on our test shelf contained one (2026-10-05).
 - Spans land where they are not allowed (inside `<option>`, `<picture>`, or
   directly in an EPUB 2 `<blockquote>`). On the test shelf this added 3,994
   validation errors to two books.
