@@ -36,7 +36,7 @@ rules](https://doc.rust-lang.org/cargo/reference/semver.html).
   encoding a document left alone for its encoding is in, read with
   epubveri's `encoding::sniff`. `content::codes` holds the `KEPUB-` codes.
 - `kepubverto-wasm`: a document left as it was carries `code` and
-  `severity`, as in the CLI's `--format json`.
+  `severity`, as in the CLI's `--format json`. The web page shows them.
 
 ### Changed
 

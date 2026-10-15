@@ -82,7 +82,7 @@
         <div id="left" hidden>
           <p>These documents could not be converted and are in the download exactly as they were:</p>
           <table>
-            <thead><tr><th>Document</th><th>Why</th></tr></thead>
+            <thead><tr><th>Document</th><th>Why</th><th>Code</th></tr></thead>
             <tbody id="leftrows"></tbody>
           </table>
         </div>
@@ -196,7 +196,7 @@
         $("verdict").innerHTML = r.complete
           ? '<span class="verdict valid">✓ Converted</span>'
           : '<span class="verdict invalid">Converted, with ' + left.length +
-            " document" + (left.length === 1 ? "" : "s") + " left as they were</span>";
+            (left.length === 1 ? " document left as it was" : " documents left as they were") + "</span>";
         let counts = count("converted") + " of " + docs.length + " content documents converted, " +
           spans.toLocaleString("en") + " spans added";
         if (count("already_converted")) counts += ", " + count("already_converted") + " already converted";
@@ -211,7 +211,10 @@
           p.textContent = d.path;
           const w = document.createElement("td");
           w.textContent = d.reason;
-          tr.append(p, w);
+          // The code the CLI's --format json gives it, and its severity.
+          const c = document.createElement("td");
+          c.textContent = d.code + " (" + d.severity + ")";
+          tr.append(p, w, c);
           rows.append(tr);
         }
         $("left").hidden = left.length === 0;
