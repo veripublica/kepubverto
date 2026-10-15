@@ -13,7 +13,7 @@ conversion is still valid after it.
 
 ## Status
 
-Early but working: the conversion is tested on a 544-book shelf and on a
+Early but working: the conversion is tested on a 562-book shelf and on a
 real Kobo. `--format json` is still to come.
 
 What the conversion does is written down in [docs/SPANS.md](docs/SPANS.md),
@@ -24,6 +24,9 @@ rule by rule. In short, in each XHTML content document it:
   highlights survive a switch between the two tools;
 - wraps the body in `<div id="book-columns"><div id="book-inner">`;
 - adds one `<style>` rule to the head.
+
+On request (`--hyphens auto` or `none`) it also adds CSS that turns
+hyphenation on or off.
 
 ## Why another converter
 
@@ -48,9 +51,9 @@ kepubverto reads documents as XML, as the EPUB specification requires, and
 inserts its markup at byte offsets. Every other byte of a document stays as it
 was, and files it does not convert are copied from the archive unchanged.
 
-On the 544-book test shelf, the conversion added **no** validation findings
+On the 562-book test shelf, the conversion added **no** validation findings
 (graded by [epubveri](https://github.com/veripublica/epubveri)), and the spans
-are identical to kepubify's in 525 books. In the rest, kepubify misreads an
+are identical to kepubify's in 543 books. In the rest, kepubify misreads an
 invalid document, or kepubverto leaves out a span that would be invalid while
 keeping kepubify's ids for all the others. [docs/SPANS.md](docs/SPANS.md) has
 the details.
@@ -88,6 +91,10 @@ none of this.
 # Convert, writing book.kepub.epub beside book.epub:
 kepubverto -i book.epub
 
+# Hyphenate (the reader's dictionary for the book's language breaks the words);
+# --hyphens none turns hyphenation off even where the book's CSS turns it on:
+kepubverto -i book.epub --hyphens auto
+
 # Choose the output, and replace it if it exists:
 kepubverto -i book.epub -o out/book.kepub.epub -f
 
@@ -119,7 +126,9 @@ with `-f`.
 | `--calibre` (`.kepub` extension) | `-o book.kepub` |
 | `--no-preserve-dirs`, `-x, --copy` | not needed: one book per run |
 | `--add-dummy-titlepage`, `--no-add-dummy-titlepage` | never adds one (kepubify adds one when a heuristic says so) |
-| `--smarten-punctuation`, `-c, --css`, `--hyphenate`, `--no-hyphenate`, `--fullscreen-reading-fixes`, `-r, --replace`, `--charset` | not yet; each will come in its own release |
+| `--hyphenate` | `--hyphens auto` |
+| `--no-hyphenate` | `--hyphens none` |
+| `--smarten-punctuation`, `-c, --css`, `--fullscreen-reading-fixes`, `-r, --replace`, `--charset` | not yet; each will come in its own release |
 | `-v, --verbose` | not yet |
 | `--version` | `-V, --version` |
 
@@ -134,7 +143,9 @@ for (path, reason) in conversion.left_alone() {
 std::fs::write("book.kepub.epub", &conversion.epub)?;
 ```
 
-`kepubverto-wasm` exposes the same function to JavaScript for the browser.
+`kepubverto::convert_with(&book, &options)` takes `Options`, where
+`hyphens: Some(Hyphens::Auto)` is the CLI's `--hyphens auto`.
+`kepubverto-wasm` exposes the same conversion to JavaScript for the browser.
 
 ## License
 

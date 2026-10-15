@@ -1,7 +1,8 @@
 //! Converts an EPUB to a KEPUB for Kobo e-readers.
 //!
 //! The conversion wraps text and images in `koboSpan` elements, wraps each
-//! body in two divs and adds one style rule (docs/SPANS.md). Span ids match
+//! body in two divs and adds one style rule (docs/SPANS.md). On request it
+//! also sets hyphenation on or off ([`Options::hyphens`]). Span ids match
 //! kepubify's, so reading positions and highlights survive a switch. Unlike a
 //! converter that re-serializes, kepubverto inserts its markup at byte
 //! offsets: every other byte of a document stays as it was, and entries the
@@ -25,7 +26,7 @@ mod segment;
 
 use std::collections::BTreeMap;
 
-pub use content::{Outcome, Reason};
+pub use content::{Hyphens, Outcome, Reason};
 
 /// The crate version, with `+<git hash>[.dirty]` when built from a checkout.
 pub const VERSION: &str = concat!(env!("CARGO_PKG_VERSION"), env!("KEPUBVERTO_BUILD"));
@@ -99,10 +100,34 @@ impl Conversion {
     }
 }
 
-/// Convert an EPUB. A content document that cannot be converted is left as
-/// it was and reported in [`Conversion::documents`]; only a book that cannot
-/// be read at all is an [`Error`].
+/// What a conversion adds beyond the spans, the divs and the style rule. The
+/// default adds nothing more.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Options {
+    /// Append a rule that sets hyphenation on or off in every converted
+    /// document (the CLI's `--hyphens`). `None` leaves it to the book.
+    pub hyphens: Option<Hyphens>,
+}
+
+/// Convert an EPUB with the default [`Options`]. A content document that
+/// cannot be converted is left as it was and reported in
+/// [`Conversion::documents`]; only a book that cannot be read at all is an
+/// [`Error`].
 pub fn convert(epub: &[u8]) -> Result<Conversion, Error> {
+    convert_with(epub, &Options::default())
+}
+
+/// Convert an EPUB with `options`, as [`convert`] does otherwise.
+///
+/// ```no_run
+/// let book = std::fs::read("book.epub")?;
+/// let options = kepubverto::Options {
+///     hyphens: Some(kepubverto::Hyphens::Auto),
+/// };
+/// let conversion = kepubverto::convert_with(&book, &options)?;
+/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// ```
+pub fn convert_with(epub: &[u8], options: &Options) -> Result<Conversion, Error> {
     let mut c = container::Container::open(epub)?;
     let package = container::package(&mut c)?;
     let mut changed = BTreeMap::new();
@@ -113,7 +138,7 @@ pub fn convert(epub: &[u8]) -> Result<Conversion, Error> {
         } else {
             match c.read(&path) {
                 Ok(Some(bytes)) => {
-                    let (outcome, out) = content::convert(&bytes, package.epub3);
+                    let (outcome, out) = content::convert(&bytes, package.epub3, options.hyphens);
                     if let Some(out) = out {
                         changed.insert(path.clone(), out);
                     }

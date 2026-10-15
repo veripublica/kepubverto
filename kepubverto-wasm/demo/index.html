@@ -56,6 +56,15 @@
       </div>
       <p class="sub">Converts an EPUB to a KEPUB for Kobo e-readers, in pure Rust, entirely in your browser — no upload, no server. Your file never leaves this page.</p>
 
+      <div class="viewopts">
+        <label for="hyphens">Hyphenation</label>
+        <select id="hyphens">
+          <option value="">as the book says</option>
+          <option value="auto">on</option>
+          <option value="none">off</option>
+        </select>
+      </div>
+
       <label class="drop" id="drop">
         <input type="file" id="file" accept=".epub,application/epub+zip" />
         Drop an <strong>.epub</strong> here, or click to choose one.
@@ -152,6 +161,7 @@
 
       let ready = false;
       let output = null;
+      let last = null; // the last book dropped, converted again when an option changes
       init()
         .then(() => {
           ready = true;
@@ -167,11 +177,13 @@
 
       async function run(file) {
         if (!ready) return;
+        last = file;
         $("result").hidden = true;
         statusEl.textContent = "Converting " + file.name + "…";
         let r;
         try {
-          r = convert(new Uint8Array(await file.arrayBuffer()));
+          // "" = leave hyphenation to the book (the CLI without --hyphens).
+          r = convert(new Uint8Array(await file.arrayBuffer()), $("hyphens").value || undefined);
         } catch (e) {
           statusEl.textContent = "Could not convert " + file.name + ": " + (e.message || e);
           return;
@@ -220,6 +232,9 @@
         setTimeout(() => URL.revokeObjectURL(url), 1000);
       });
 
+      $("hyphens").addEventListener("change", () => {
+        if (last) run(last);
+      });
       fileEl.addEventListener("change", () => {
         if (fileEl.files.length) run(fileEl.files[0]);
       });

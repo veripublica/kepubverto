@@ -22,8 +22,35 @@ pub const STYLE_EPUB3: &str =
 /// `<style>` and allows no `class` there (RSC-005), so it has no marker.
 pub const STYLE_EPUB2: &str =
     r#"<style type="text/css">div#book-inner { margin-top: 0; margin-bottom: 0;}</style>"#;
+/// The rule `--hyphens auto` appends (docs/SPANS.md, "Hyphenation"). A Kobo
+/// reads `-webkit-hyphens`; the standard property is for every other reader.
+pub const HYPHENS_AUTO: &str = "* { -webkit-hyphens: auto; hyphens: auto; } h1, h2, h3, h4, h5, h6, td { -webkit-hyphens: none !important; hyphens: none !important; }";
+/// The rule `--hyphens none` appends. `!important`, so it overrides the
+/// book's own hyphenation.
+pub const HYPHENS_NONE: &str = "* { -webkit-hyphens: none !important; hyphens: none !important; }";
 const DIVS_OPEN: &str = r#"<div id="book-columns"><div id="book-inner">"#;
 const DIVS_CLOSE: &str = "</div></div>";
+
+/// Hyphenation to set through added CSS (docs/SPANS.md, "Hyphenation").
+/// The names are the CSS `hyphens` values the rule writes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Hyphens {
+    /// Hyphenate, except in headings and table cells, where the book says
+    /// nothing else.
+    Auto,
+    /// Never hyphenate, whatever the book's CSS says.
+    None,
+}
+
+impl Hyphens {
+    /// The CSS rule this setting appends.
+    pub fn rule(self) -> &'static str {
+        match self {
+            Hyphens::Auto => HYPHENS_AUTO,
+            Hyphens::None => HYPHENS_NONE,
+        }
+    }
+}
 
 /// What converting one document came to.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -80,11 +107,12 @@ impl std::fmt::Display for Reason {
     }
 }
 
-/// Convert one content document. `epub3` says which entity rules apply: an
-/// EPUB 2 document may use the XHTML DTD's named entities. Returns the
-/// outcome, and the new bytes when the document was rewritten.
-pub fn convert(bytes: &[u8], epub3: bool) -> (Outcome, Option<Vec<u8>>) {
-    match convert_text(bytes, epub3) {
+/// Convert one content document. `epub3` says which entity rules apply (an
+/// EPUB 2 document may use the XHTML DTD's named entities) and which form the
+/// added `<style>` elements take. `hyphens`, when set, appends its rule.
+/// Returns the outcome, and the new bytes when the document was rewritten.
+pub fn convert(bytes: &[u8], epub3: bool, hyphens: Option<Hyphens>) -> (Outcome, Option<Vec<u8>>) {
+    match convert_text(bytes, epub3, hyphens) {
         Ok(Some((out, spans))) => (Outcome::Converted { spans }, Some(out.into_bytes())),
         Ok(None) => (Outcome::NothingToDo, None),
         Err(Stop::Already) => (Outcome::AlreadyConverted, None),
@@ -103,7 +131,11 @@ impl From<Reason> for Stop {
     }
 }
 
-fn convert_text(bytes: &[u8], epub3: bool) -> Result<Option<(String, usize)>, Stop> {
+fn convert_text(
+    bytes: &[u8],
+    epub3: bool,
+    hyphens: Option<Hyphens>,
+) -> Result<Option<(String, usize)>, Stop> {
     let original = std::str::from_utf8(bytes).map_err(|_| Reason::NotUtf8)?;
     // The XHTML DTD's entities are declared for parsing only. Offsets in the
     // parsed text past the insertion are mapped back by `shift`.
@@ -161,11 +193,24 @@ fn convert_text(bytes: &[u8], epub3: bool) -> Result<Option<(String, usize)>, St
         }
     }
     if let Some(head) = head
-        && !head.descendants().any(is_style_rule)
         && let Some(content) = content_range(&text, head.range())
     {
-        let style = if epub3 { STYLE_EPUB3 } else { STYLE_EPUB2 };
-        w.edits.push(Edit::new(content.end, Order::Last, style));
+        // Both at the end of <head>, in this order (the sort is stable).
+        if !head.descendants().any(is_style_rule) {
+            let style = if epub3 { STYLE_EPUB3 } else { STYLE_EPUB2 };
+            w.edits.push(Edit::new(content.end, Order::Last, style));
+        }
+        if let Some(h) = hyphens
+            && !head.descendants().any(is_hyphens_rule)
+        {
+            let open = if epub3 {
+                "<style>"
+            } else {
+                r#"<style type="text/css">"#
+            };
+            let style = format!("{open}{}</style>", h.rule());
+            w.edits.push(Edit::new(content.end, Order::Last, style));
+        }
     }
 
     if w.edits.is_empty() {
@@ -428,6 +473,14 @@ fn has_class(n: Node, token: &str) -> bool {
 fn is_style_rule(n: Node) -> bool {
     has_class(n, "kobostylehacks")
         || (is_xhtml(n, "style") && n.text().is_some_and(|t| t.trim() == STYLE_RULE))
+}
+
+/// A hyphenation rule is already there: a `<style>` holding exactly one of
+/// the two, whichever value it was converted with.
+fn is_hyphens_rule(n: Node) -> bool {
+    is_xhtml(n, "style")
+        && n.text()
+            .is_some_and(|t| matches!(t.trim(), HYPHENS_AUTO | HYPHENS_NONE))
 }
 
 fn is_div_with_id(n: Node, id: &str) -> bool {

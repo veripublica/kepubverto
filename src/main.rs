@@ -13,7 +13,7 @@
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use kepubverto::{Conversion, Outcome};
+use kepubverto::{Conversion, Hyphens, Options, Outcome};
 
 const HELP: &str = "\
 kepubverto — convert an EPUB to a KEPUB for Kobo e-readers
@@ -28,12 +28,19 @@ OPTIONS:
                             <input-stem>.kepub.epub, beside the input.
     -f, --force             Permit replacing existing output files. Never lifts
                             the output-equals-input refusal.
+        --hyphens <auto|none>
+                            Add CSS that turns hyphenation on (auto) or off
+                            (none) in every converted document. auto leaves
+                            headings, table cells and the book's own
+                            per-element choices alone; none overrides the
+                            book. Without it, the book decides.
         --format <FORMAT>   Report format: human (the default).
     -V, --version           Print kepubverto <version> to stdout and exit 0.
     -h, --help              Print this help to stdout and exit 0.
 
 EXAMPLES:
     kepubverto -i book.epub                 # writes book.kepub.epub
+    kepubverto -i book.epub --hyphens auto  # also hyphenate
     kepubverto -i book.epub -o out.kepub.epub -f
 
 The original is never modified in place, and an existing output file is never
@@ -68,6 +75,7 @@ struct Run {
     input: String,
     output: Option<String>,
     force: bool,
+    hyphens: Option<Hyphens>,
 }
 
 /// Parse the arguments after the program name into a [`Cli`] decision.
@@ -82,6 +90,7 @@ fn parse(args: &[String]) -> Cli {
     let mut inputs: Vec<String> = Vec::new();
     let mut output: Option<String> = None;
     let mut format: Option<String> = None;
+    let mut hyphens: Option<String> = None;
     let mut force = false;
     let mut help = false;
     let mut version = false;
@@ -117,7 +126,7 @@ fn parse(args: &[String]) -> Cli {
                 "help" => help = true,
                 "version" => version = true,
                 "force" => force = true,
-                "input" | "output" | "format" => {
+                "input" | "output" | "format" | "hyphens" => {
                     let value = match attached {
                         Some(v) => v,
                         None => {
@@ -135,6 +144,7 @@ fn parse(args: &[String]) -> Cli {
                         "input" => inputs.push(value),
                         "output" => set_single!(output, "--output", value),
                         "format" => set_single!(format, "--format", value),
+                        "hyphens" => set_single!(hyphens, "--hyphens", value),
                         _ => unreachable!(),
                     }
                 }
@@ -193,6 +203,15 @@ fn parse(args: &[String]) -> Cli {
     {
         fail!("invalid value '{f}' for --format; supported values: human");
     }
+    let hyphens = match hyphens.as_deref() {
+        None => None,
+        Some("auto") => Some(Hyphens::Auto),
+        Some("none") => Some(Hyphens::None),
+        Some(h) => {
+            fail!("invalid value '{h}' for --hyphens; supported values: auto, none");
+            None
+        }
+    };
 
     // Precedence: help short-circuits even a malformed line; a usage error
     // outranks a version request; version outranks a run; a run needs an input.
@@ -213,6 +232,7 @@ fn parse(args: &[String]) -> Cli {
             input: inputs.remove(0),
             output,
             force,
+            hyphens,
         }),
         n => Cli::Usage(format!(
             "kepubverto converts one book at a time: expected 1 input, got {n}"
@@ -268,8 +288,11 @@ fn execute(run: &Run) -> Result<ExitCode, String> {
         return Err(format!("'{}' exists; use -f to replace it", out.display()));
     }
 
-    let conversion =
-        kepubverto::convert(&bytes).map_err(|e| format!("cannot convert {}: {e}", run.input))?;
+    let options = Options {
+        hyphens: run.hyphens,
+    };
+    let conversion = kepubverto::convert_with(&bytes, &options)
+        .map_err(|e| format!("cannot convert {}: {e}", run.input))?;
     std::fs::write(&out, &conversion.epub)
         .map_err(|e| format!("cannot write {}: {e}", out.display()))?;
 
@@ -427,6 +450,41 @@ mod tests {
             Cli::Usage("invalid value 'json' for --format; supported values: human".into())
         );
         assert_eq!(run_of(&["-i", "a.epub", "--format=human"]).input, "a.epub");
+    }
+
+    #[test]
+    fn hyphens_takes_the_css_values() {
+        assert_eq!(run_of(&["-i", "a.epub"]).hyphens, None);
+        assert_eq!(
+            run_of(&["-i", "a.epub", "--hyphens", "auto"]).hyphens,
+            Some(Hyphens::Auto)
+        );
+        assert_eq!(
+            run_of(&["-i", "a.epub", "--hyphens=none"]).hyphens,
+            Some(Hyphens::None)
+        );
+        // Values are lowercase and matched exactly (§3.5).
+        assert_eq!(
+            parse_str(&["-i", "a.epub", "--hyphens", "Auto"]),
+            Cli::Usage("invalid value 'Auto' for --hyphens; supported values: auto, none".into())
+        );
+        // kepubify's flag pair is not accepted.
+        assert_eq!(
+            parse_str(&["-i", "a.epub", "--hyphenate"]),
+            Cli::Usage("unexpected option '--hyphenate'".into())
+        );
+    }
+
+    #[test]
+    fn hyphens_twice_is_two_answers_to_one_question() {
+        assert_eq!(
+            parse_str(&["-i", "a.epub", "--hyphens", "auto", "--hyphens", "none"]),
+            Cli::Usage("option '--hyphens' given more than once".into())
+        );
+        assert_eq!(
+            parse_str(&["-i", "a.epub", "--hyphens"]),
+            Cli::Usage("option '--hyphens' needs a value".into())
+        );
     }
 
     #[test]

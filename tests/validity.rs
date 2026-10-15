@@ -104,14 +104,14 @@ fn findings(epub: &[u8]) -> Vec<String> {
         .collect()
 }
 
-fn stays_valid(epub3: bool) {
+fn stays_valid(epub3: bool, options: kepubverto::Options) {
     let input = book(epub3);
     assert_eq!(
         findings(&input),
         Vec::<String>::new(),
         "the fixture itself must have no finding"
     );
-    let c = kepubverto::convert(&input).unwrap();
+    let c = kepubverto::convert_with(&input, &options).unwrap();
     assert!(c.complete());
     assert!(
         c.spans() > 40,
@@ -123,10 +123,21 @@ fn stays_valid(epub3: bool) {
 
 #[test]
 fn a_valid_epub3_stays_valid() {
-    stays_valid(true);
+    stays_valid(true, Default::default());
 }
 
 #[test]
 fn a_valid_epub2_stays_valid() {
-    stays_valid(false);
+    stays_valid(false, Default::default());
+}
+
+/// Every `--hyphens` value, in both versions: the added CSS and its
+/// `<style>` element add no finding either.
+#[test]
+fn hyphens_keeps_a_valid_book_valid() {
+    for epub3 in [true, false] {
+        for h in [kepubverto::Hyphens::Auto, kepubverto::Hyphens::None] {
+            stays_valid(epub3, kepubverto::Options { hyphens: Some(h) });
+        }
+    }
 }

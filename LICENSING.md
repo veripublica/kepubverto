@@ -29,8 +29,9 @@ program it compiles.
 what it adds. The conversion itself adds structural markup: `koboSpan`
 wrappers around sentences and images, with identifiers derived mechanically
 from their position; the `book-columns` / `book-inner` wrapper divs; and one small
-`<style>` rule for them. Optional fixes you switch on change your own text or
-add CSS you supply. Nothing expressive of ours, and nothing we would have any
+`<style>` rule for them. If you ask for it (`--hyphens`), one more `<style>`
+rule that turns hyphenation on or off. Optional fixes you switch on change your
+own text or add CSS you supply. Nothing expressive of ours, and nothing we would have any
 claim over even if the license reached the output, which it does not.
 
 Sell the result, ship it to a retailer, load it on your own reader. You owe us

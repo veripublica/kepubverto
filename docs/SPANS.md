@@ -42,6 +42,9 @@ The conversion changes three things in an XHTML content document:
    `<div id="book-columns"><div id="book-inner">…</div></div>`.
 3. It appends one `<style>` element to `<head>`.
 
+With `--hyphens`, it appends a second `<style>` element after that one
+([Hyphenation](#hyphenation---hyphens)). Nothing else is optional.
+
 Every byte of the original document that is not one of these insertions is
 written out unchanged. kepubverto does not re-serialize documents: the XML
 declaration, the DOCTYPE, entity references, namespace prefixes, attribute
@@ -247,6 +250,71 @@ whose text is exactly the rule (ours in EPUB 2, which has no marker). A
 document converted earlier but that has no `koboSpan` (no text at all) would
 otherwise get the rule twice, which is what kepubify itself does.
 
+## Hyphenation (`--hyphens`)
+
+Off unless asked for. Without `--hyphens`, kepubverto adds nothing about
+hyphenation, and the book's own CSS decides. With it, a second `<style>`
+element is appended to `<head>`, right after the style rule, in the form the
+EPUB version allows: `<style>` in EPUB 3, `<style type="text/css">` in
+EPUB 2. Neither carries a class, so neither needs one the version forbids.
+
+`--hyphens auto` writes:
+
+```css
+* { -webkit-hyphens: auto; hyphens: auto; } h1, h2, h3, h4, h5, h6, td { -webkit-hyphens: none !important; hyphens: none !important; }
+```
+
+`--hyphens none` writes:
+
+```css
+* { -webkit-hyphens: none !important; hyphens: none !important; }
+```
+
+Why each part is there:
+
+- **`-webkit-hyphens` and `hyphens`.** A Kobo Forma (software 4.38.23828,
+  the kepub renderer at its default) hyphenates on `-webkit-hyphens` and
+  ignores the standard property. The standard one is written too, for
+  readers and firmware that read it. Neither adds a finding.
+- **`auto` has no `!important`.** It sets hyphenation on where the book says
+  nothing. A rule the book sets on an element (`p { hyphens: manual }`) wins
+  over `*`, so a publisher's explicit choice is kept.
+- **`none` has `!important`.** Switching hyphenation off is the reader's
+  explicit request, so it overrides the book's own CSS. Checked on the device:
+  a book whose stylesheet hyphenates stops hyphenating.
+- **Headings and table cells are not hyphenated** under `auto`: a broken word
+  in a heading or a narrow cell reads worse than a short line.
+- **Words are broken by the reader**, with its dictionary for the book's
+  language. kepubverto adds no rule of its own about where. On the device, a
+  Turkish book (language in the OPF only, no `lang` on `<html>`) was broken by
+  Turkish rules; the one wrong break seen, *İsviçr-e'nin*, is the dictionary's
+  handling of a suffix after an apostrophe, and no CSS here changes it.
+
+The element is not appended when `<head>` already has a `<style>` whose text
+is exactly one of the two rules above, so converting again never adds a
+second one. A document that is already converted (it has a `koboSpan`) is
+left as it is, as everywhere else in this document: to change the
+hyphenation of a book, convert the original EPUB.
+
+kepubify's `--hyphenate` and `--no-hyphenate` do the same job differently
+*(oracle, 2026-10-15)*: the element is `<style type="text/css"
+class="kepubify-hyphenate">` (or `kepubify-nohyphenate`) in both versions,
+an error in every EPUB 2 document for the reason given in
+[The style rule](#the-style-rule); it adds `-moz-hyphens`, which no Kobo
+reads, and `-webkit-hyphenate-limit-before`, `-after` and `-lines`, which
+made no visible difference on the device and did not prevent the wrong break
+above.
+
+Checked (2026-10-15) on Pride and Prejudice (Project Gutenberg, EPUB 3,
+English) and a Turkish EPUB 2 book: findings added 0 at every severity, usage
+included, in epubveri 0.25.0 and 0.28.0 and epubcheck 5.4.0. On the Kobo
+Forma: `auto` hyphenates (the device does not by default); a book that
+hyphenates by itself still does, and stops under `none`. Checked twice:
+with hand-built variants first, then with kepubverto's own output. Shelf run the same
+day, 562 books (the 544 plus 18 added since), epubveri 0.28.0: findings added
+0 at every severity with no option, `--hyphens auto` and `--hyphens none`
+alike, and the spans the same in all three.
+
 ## How "never make a book worse" is kept
 
 kepubverto converts. It does not validate. Checking a book belongs to
@@ -259,14 +327,14 @@ The promise that a valid book stays valid therefore rests on how the
 conversion is built and tested, not on a check at run time:
 
 - **By construction.** Documents are read as XML, and only the three
-  insertions above are made. Every other byte is kept. The rules skip every
+  insertions above are made (four with `--hyphens`). Every other byte is kept. The rules skip every
   place where a `span` would be invalid, and any document where an added id
   would collide. A document that cannot be read is left as it was.
 - **On every commit.** CI converts a fixture set (public-domain books and
   synthetic edge cases) and grades input and output with epubveri. Any
   finding the output has and the input did not, at any severity, fails the
   build.
-- **Before every release.** The whole test shelf (544 real books) is
+- **Before every release.** The whole test shelf (562 real books) is
   converted, and the findings the conversion added must be zero, at every
   severity, usage included: a reader sees the total.
 
@@ -275,14 +343,18 @@ around in one. The rule in
 [Where a span would be invalid](#where-a-span-would-be-invalid) came from
 the first such run.
 
-The last run (2026-10-12, for 0.1.1), all 544 shelf books, kepubify 4.0.4
-as the oracle:
+The last run (2026-10-15, for 0.2.0), all 562 shelf books, kepubify 4.0.4
+as the oracle, three times: with no option, `--hyphens auto` and
+`--hyphens none`:
 
-- **Findings added by the conversion: 0** (epubveri 0.25.0, every severity,
-  usage included, before and after). The 0.1.0 run counted errors and fatals
-  only, with epubveri 0.24.0, which did not see the EPUB 2 `<style>` error
-  described in [The style rule](#the-style-rule).
-- **Spans identical to kepubify's in 525 books.** In the other 19, every
+- **Findings added by the conversion: 0** in all three (epubveri 0.28.0,
+  every severity, usage included, before and after). The 0.1.1 run (544
+  books, epubveri 0.25.0) also added 0. The 0.1.0 run counted errors and
+  fatals only, with epubveri 0.24.0, which did not see the EPUB 2 `<style>`
+  error described in [The style rule](#the-style-rule).
+- **Spans identical to kepubify's in 543 books**, and the same in all three
+  runs. The 18 books added to the shelf since 0.1.1 have no difference. In
+  the other 19, every
   difference is one of: markup an HTML parser rebuilds, a block element inside
   a `p` or a self-closed non-void element, where kepubify misreads the
   document (13 books); spans left out where they would be invalid, the rest
@@ -297,8 +369,9 @@ kepubify also changes things this version leaves alone:
 - character-set declarations in content documents;
 - the OPF (cover metadata);
 - leftover files from other tools (`__MACOSX/`, `.DS_Store`, …);
-- optional features: smart punctuation, find and replace, hyphenation and
-  fullscreen CSS, extra CSS, a generated title page.
+- optional features: smart punctuation, find and replace, fullscreen CSS,
+  extra CSS, a generated title page. (Hyphenation is in: see
+  [Hyphenation](#hyphenation---hyphens).)
 
 Each may come in a later version, one at a time, with its own section here.
 

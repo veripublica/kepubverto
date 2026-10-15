@@ -10,6 +10,21 @@ rules](https://doc.rust-lang.org/cargo/reference/semver.html).
 
 ## [Unreleased]
 
+### Added
+
+- `--hyphens <auto|none>` adds CSS that turns hyphenation on or off in every
+  converted document; without it, the book's own CSS decides. `auto` leaves
+  headings, table cells and the book's per-element choices alone; `none`
+  overrides the book. It writes `-webkit-hyphens`, which Kobo readers use,
+  and the standard `hyphens`, in the `<style>` form each EPUB version allows.
+  kepubify's `--hyphenate` / `--no-hyphenate` map to `auto` / `none`
+  (docs/SPANS.md, "Hyphenation").
+- Library: `convert_with(&epub, &Options)` and `Hyphens`; `convert` is
+  `convert_with` with the default options. `content::convert` takes the
+  hyphenation setting as a third argument.
+- Web page and `kepubverto-wasm`: a hyphenation choice, and
+  `convert(epub, hyphens?)`.
+
 ### Changed
 
 - Requires epubveri 0.28 (its `encoding` module, which classifies a

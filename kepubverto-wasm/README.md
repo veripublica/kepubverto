@@ -26,9 +26,13 @@ const r = convert(new Uint8Array(await file.arrayBuffer()));
 // r.documents: [{ path, outcome, spans, reason? }]
 //   outcome: "converted" | "already_converted" | "nothing_to_do" | "left_alone"
 //   reason:  why a document was left as it was, for a person to read
+
+// The CLI's --hyphens: "auto" turns hyphenation on, "none" off.
+convert(bytes, "auto");
 ```
 
-`convert` throws when the file cannot be read as an EPUB at all.
+`convert` throws when the file cannot be read as an EPUB at all, and on a
+`hyphens` value other than `"auto"` or `"none"`.
 
 ## License
 

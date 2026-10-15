@@ -7,6 +7,7 @@
 //! const r = convert(new Uint8Array(await file.arrayBuffer()));
 //! r.documents.filter((d) => d.outcome === "left_alone"); // and why, in d.reason
 //! const kepub = r.epub; // Uint8Array → download <name>.kepub.epub
+//! convert(bytes, "auto"); // the CLI's --hyphens auto ("none" turns it off)
 //! ```
 
 use serde::Serialize;
@@ -45,10 +46,24 @@ pub struct Conversion {
     pub complete: bool,
 }
 
-/// Convert an EPUB. Throws when the book cannot be read at all.
+/// Convert an EPUB. `hyphens` mirrors the CLI's `--hyphens`: `"auto"` or
+/// `"none"` adds CSS that turns hyphenation on or off; leave it out to let the
+/// book decide. Throws on any other value, and when the book cannot be read
+/// at all.
 #[wasm_bindgen]
-pub fn convert(epub: &[u8]) -> Result<Conversion, JsError> {
-    let c = kepubverto::convert(epub).map_err(|e| JsError::new(&e.to_string()))?;
+pub fn convert(epub: &[u8], hyphens: Option<String>) -> Result<Conversion, JsError> {
+    let hyphens = match hyphens.as_deref() {
+        None => None,
+        Some("auto") => Some(kepubverto::Hyphens::Auto),
+        Some("none") => Some(kepubverto::Hyphens::None),
+        Some(h) => {
+            return Err(JsError::new(&format!(
+                "invalid value '{h}' for hyphens; supported values: auto, none"
+            )));
+        }
+    };
+    let options = kepubverto::Options { hyphens };
+    let c = kepubverto::convert_with(epub, &options).map_err(|e| JsError::new(&e.to_string()))?;
     let complete = c.complete();
     let documents = c
         .documents

@@ -2,7 +2,7 @@
 
 use std::io::{Cursor, Read, Write};
 
-use kepubverto::{Outcome, Reason, convert};
+use kepubverto::{Hyphens, Options, Outcome, Reason, convert, convert_with};
 use zip::write::SimpleFileOptions;
 use zip::{CompressionMethod, ZipArchive, ZipWriter};
 
@@ -154,6 +154,50 @@ fn the_unmarked_epub2_style_is_not_added_again() {
     );
     let c = convert(&book(false, &[&doc])).unwrap();
     assert_eq!(c.documents[0].outcome, Outcome::NothingToDo);
+}
+
+fn with_hyphens(h: Hyphens) -> Options {
+    Options { hyphens: Some(h) }
+}
+
+#[test]
+fn hyphens_appends_its_rule_after_the_style_rule() {
+    let auto = kepubverto::content::HYPHENS_AUTO;
+    let none = kepubverto::content::HYPHENS_NONE;
+    let epub3 = book(true, &[&page(EPUB3_HEAD, "<p>x</p>")]);
+    let epub2 = book(false, &[&page(EPUB2_HEAD, "<p>x</p>")]);
+
+    let c = convert_with(&epub3, &with_hyphens(Hyphens::Auto)).unwrap();
+    let out = entry(&c.epub, "OEBPS/Text/c0.xhtml");
+    assert!(
+        out.contains(&format!("{STYLE}<style>{auto}</style></head>")),
+        "{out}"
+    );
+
+    let c = convert_with(&epub2, &with_hyphens(Hyphens::None)).unwrap();
+    let out = entry(&c.epub, "OEBPS/Text/c0.xhtml");
+    assert!(
+        out.contains(&format!(
+            "{STYLE_EPUB2}<style type=\"text/css\">{none}</style></head>"
+        )),
+        "{out}"
+    );
+
+    // Without the option, nothing about hyphenation is added.
+    let out = entry(&convert(&epub3).unwrap().epub, "OEBPS/Text/c0.xhtml");
+    assert!(!out.contains("hyphens"), "{out}");
+}
+
+#[test]
+fn the_hyphens_rule_is_not_added_again() {
+    // No text, so no span marks the document as converted: the rule text
+    // itself shows that it is there, whichever value it was converted with.
+    let doc = page(EPUB3_HEAD, "<hr/>");
+    let once = convert_with(&book(true, &[&doc]), &with_hyphens(Hyphens::Auto)).unwrap();
+    for h in [Hyphens::Auto, Hyphens::None] {
+        let twice = convert_with(&once.epub, &with_hyphens(h)).unwrap();
+        assert_eq!(twice.documents[0].outcome, Outcome::NothingToDo);
+    }
 }
 
 #[test]
