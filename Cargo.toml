@@ -24,7 +24,7 @@ members = ["kepubverto-wasm"]
 # the `envelope` types for `--format json`. epubveri does not validate
 # anything at run time here (docs/SPANS.md, "How never make a book worse is
 # kept").
-epubveri = "0.25"
+epubveri = "0.28"
 # Pure Rust: the "deflate" feature uses zlib-rs on the 8.x line; bzip2/zstd (C)
 # stay disabled. The family shares one zip major.
 zip = { version = "8.6", default-features = false, features = ["deflate"] }

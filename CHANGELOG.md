@@ -8,6 +8,14 @@ kepubverto is pre-1.0, so breaking changes land as minor-version bumps
 (`0.x.0`), per [Cargo's SemVer compatibility
 rules](https://doc.rust-lang.org/cargo/reference/semver.html).
 
+## [Unreleased]
+
+### Changed
+
+- Requires epubveri 0.28 (its `encoding` module, which classifies a
+  document's encoding the way epubcheck does, and `Input::transformed`:
+  groundwork for `--format json`).
+
 ## [0.1.1] - 2026-10-12
 
 ### Fixed
