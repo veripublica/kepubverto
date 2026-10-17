@@ -366,6 +366,14 @@ as the oracle, three times: with no option, `--hyphens auto` and
   the text differs, because an HTML parser maps `&#128;` to `&#159;` onto
   Windows-1252 characters.
 
+The zip 9 move (2026-10-17, for 0.2.1), all 562 books with no option:
+findings added 0 (epubveri 0.29.1, every severity, usage included), spans
+identical to kepubify's in the same 543. Against 0.2.0's output, every
+entry's contents, order, method and CRC are the same in every book; what
+differs is the metadata of entries copied unchanged, which now keeps the
+"made by" system and file attributes of the input (zip 8 rewrote them as
+Unix ones).
+
 ## What kepubverto does not do (in this version)
 
 kepubify also changes things this version leaves alone:
