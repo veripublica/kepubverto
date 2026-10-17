@@ -8,6 +8,30 @@ kepubverto is pre-1.0, so breaking changes land as minor-version bumps
 (`0.x.0`), per [Cargo's SemVer compatibility
 rules](https://doc.rust-lang.org/cargo/reference/semver.html).
 
+## [Unreleased]
+
+### Changed
+
+- zip 9 (`>= 9.0.4`), which clears RUSTSEC-2026-0367, -0368 and -0369 (zip
+  below 9.0.0; kepubverto never called the affected `extract`). epubveri
+  0.29.1, tsify 0.5.8 and the compatible updates. Without options the
+  converted entries are the same as 0.2.0's on all 562 shelf books.
+- An entry copied unchanged keeps the "made by" system and the file
+  attributes the input gives it. zip 8 rewrote both to Unix ones.
+- Under zip 9, stored and deflated entries are inflated from their raw
+  bytes, as epubveri and epubsana do, and untouched entries are copied
+  without extra fields, as zip 8 copied them. So a book with an entry whose
+  header understates its size, or with an Info-ZIP Unix extra field
+  (0x7875), converts as it did with 0.2.0; zip 9 alone refuses both.
+
+### Fixed
+
+- An entry whose CRC is wrong no longer stops the conversion (exit 2, or a
+  document left alone); epubcheck ignores the CRC too.
+- `kepubverto-wasm`: `convert` returns its result as `tsify::Ts`, since
+  `into_wasm_abi` leaked memory (tsify issue #65). The `.d.ts` types are
+  unchanged.
+
 ## [0.2.0] - 2026-10-15
 
 ### Added

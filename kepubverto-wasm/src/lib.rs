@@ -11,7 +11,7 @@
 //! ```
 
 use serde::Serialize;
-use tsify::Tsify;
+use tsify::{Ts, Tsify};
 use wasm_bindgen::prelude::*;
 
 /// The crate version, with the git hash it was built from.
@@ -22,7 +22,6 @@ pub fn version() -> String {
 
 /// One content document and what became of it.
 #[derive(Serialize, Tsify)]
-#[tsify(into_wasm_abi)]
 pub struct Document {
     pub path: String,
     /// `"converted"`, `"already_converted"`, `"nothing_to_do"` or `"left_alone"`.
@@ -46,7 +45,6 @@ pub struct Document {
 }
 
 #[derive(Serialize, Tsify)]
-#[tsify(into_wasm_abi)]
 pub struct Conversion {
     #[serde(with = "serde_bytes_as_array")]
     #[tsify(type = "Uint8Array")]
@@ -61,7 +59,14 @@ pub struct Conversion {
 /// book decide. Throws on any other value, and when the book cannot be read
 /// at all.
 #[wasm_bindgen]
-pub fn convert(epub: &[u8], hyphens: Option<String>) -> Result<Conversion, JsError> {
+pub fn convert(epub: &[u8], hyphens: Option<String>) -> Result<Ts<Conversion>, JsError> {
+    Ok(Ts::from_rust(&conversion(epub, hyphens)?)?)
+}
+
+// The body of `convert`, kept apart so a native test can read what it returns:
+// a `Ts<…>` holds a JavaScript value, which a native test cannot build. The
+// documentation is on `convert`, since that is what reaches the `.d.ts`.
+fn conversion(epub: &[u8], hyphens: Option<String>) -> Result<Conversion, JsError> {
     let hyphens = match hyphens.as_deref() {
         None => None,
         Some("auto") => Some(kepubverto::Hyphens::Auto),

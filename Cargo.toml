@@ -24,10 +24,16 @@ members = ["kepubverto-wasm"]
 # the `envelope` types for `--format json`. epubveri does not validate
 # anything at run time here (docs/SPANS.md, "How never make a book worse is
 # kept").
-epubveri = "0.28"
-# Pure Rust: the "deflate" feature uses zlib-rs on the 8.x line; bzip2/zstd (C)
-# stay disabled. The family shares one zip major.
-zip = { version = "8.6", default-features = false, features = ["deflate"] }
+epubveri = "0.29.1"
+# Pure Rust: the "deflate" feature uses zlib-rs; bzip2/zstd (C) stay disabled.
+# The family shares one zip major. 9.0.4 is the floor epubveri tested; below
+# 9.0.0, RUSTSEC-2026-0367/0368/0369 apply.
+zip = { version = "9.0.4", default-features = false, features = ["deflate"] }
+# Inflates stored and deflated entries in `Container::read`, as epubveri and
+# epubsana do: zip 9 refuses an entry longer than its header declares, and one
+# with a wrong CRC, where epubcheck reads both. Same version and pure-Rust
+# backend as zip's own "deflate" feature selects.
+flate2 = { version = "1.1", default-features = false, features = ["zlib-rs"] }
 # Parse to find byte ranges, then insert at offsets; the document itself is
 # never re-serialized. The same parser epubveri uses.
 roxmltree = "0.21"

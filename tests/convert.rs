@@ -107,7 +107,7 @@ fn untouched_entries_are_copied_raw() {
         ZipArchive::new(Cursor::new(b))
             .unwrap()
             .file_names()
-            .map(str::to_string)
+            .map(|n| n.unwrap().into_owned())
             .collect::<Vec<_>>()
     };
     let mut a = names(&input);
@@ -358,7 +358,7 @@ fn a_missing_document_is_reported_not_fatal() {
     let mut z = ZipWriter::new(Cursor::new(Vec::new()));
     for i in 0..src.len() {
         let f = src.by_index_raw(i).unwrap();
-        if f.name() == "OEBPS/content.opf" {
+        if f.name().unwrap() == "OEBPS/content.opf" {
             drop(f);
             z.start_file("OEBPS/content.opf", SimpleFileOptions::default())
                 .unwrap();
@@ -381,7 +381,7 @@ fn as_text_html(input: &[u8]) -> Vec<u8> {
     let mut z = ZipWriter::new(Cursor::new(Vec::new()));
     for i in 0..src.len() {
         let f = src.by_index_raw(i).unwrap();
-        if f.name() == "OEBPS/content.opf" {
+        if f.name().unwrap() == "OEBPS/content.opf" {
             drop(f);
             z.start_file("OEBPS/content.opf", SimpleFileOptions::default())
                 .unwrap();
@@ -521,4 +521,97 @@ fn a_file_that_is_not_a_zip_is_an_error() {
         convert(b"not a zip"),
         Err(kepubverto::Error::NotAnEpub(_))
     ));
+}
+
+/// Overwrite `bytes` at `local_at` in `name`'s local header and at
+/// `central_at` in its central directory record.
+fn patch_headers(epub: &mut [u8], name: &str, local_at: usize, central_at: usize, bytes: &[u8]) {
+    for (sig, name_at, at) in [
+        (&b"PK\x03\x04"[..], 30, local_at),
+        (&b"PK\x01\x02"[..], 46, central_at),
+    ] {
+        let i = (0..epub.len() - name_at)
+            .find(|&i| {
+                epub[i..].starts_with(sig) && epub[i + name_at..].starts_with(name.as_bytes())
+            })
+            .unwrap();
+        epub[i + at..i + at + bytes.len()].copy_from_slice(bytes);
+    }
+}
+
+/// zip 9 refuses both by default; epubcheck and epubveri read them, so the
+/// book still converts (src/container.rs, `Container::inflate`).
+#[test]
+fn a_wrong_crc_or_an_understated_size_still_converts() {
+    let doc = page(EPUB3_HEAD, "<p>x</p>");
+    let mut wrong_crc = book(true, &[&doc]);
+    patch_headers(&mut wrong_crc, "OEBPS/Text/c0.xhtml", 14, 16, &[0; 4]);
+    let mut undersized = book(true, &[&doc]);
+    patch_headers(
+        &mut undersized,
+        "OEBPS/Text/c0.xhtml",
+        22,
+        24,
+        &[1, 0, 0, 0],
+    );
+    for input in [wrong_crc, undersized] {
+        let c = convert(&input).unwrap();
+        assert!(c.complete());
+        assert!(entry(&c.epub, "OEBPS/Text/c0.xhtml").contains("kobo.1.1"));
+    }
+}
+
+/// An untouched entry is copied with no extra field in either header, as
+/// under zip 8. zip 9's `raw_copy_file` refuses an Info-ZIP Unix field
+/// (0x7875) without its "unreserved" feature, which stopped a shelf book
+/// from being written.
+#[test]
+fn an_untouched_entry_with_a_unix_extra_field_is_copied_without_it() {
+    let doc = page(EPUB3_HEAD, "<p>x</p>");
+    let mut input = book(true, &[&doc]);
+    // Rebuild with a 0x5455 field on the stylesheet, then re-tag it 0x7875.
+    {
+        let mut src = ZipArchive::new(Cursor::new(input.clone())).unwrap();
+        let mut z = ZipWriter::new(Cursor::new(Vec::new()));
+        for i in 0..src.len() {
+            let f = src.by_index_raw(i).unwrap();
+            if f.name().unwrap() != "OEBPS/style.css" {
+                z.raw_copy_file(f).unwrap();
+                continue;
+            }
+            drop(f);
+            let mut opts = zip::write::FullFileOptions::default()
+                .compression_method(CompressionMethod::Deflated);
+            opts.add_extra_field(0x5455, [1u8, 0, 0, 0, 0], false)
+                .unwrap();
+            z.start_file("OEBPS/style.css", opts).unwrap();
+            z.write_all(b"p { margin: 0 }").unwrap();
+        }
+        input = z.finish().unwrap().into_inner();
+    }
+    let extra_lengths = |epub: &[u8]| {
+        let mut out = Vec::new();
+        for (sig, name_at, len_at) in [(&b"PK\x03\x04"[..], 30, 28), (&b"PK\x01\x02"[..], 46, 30)] {
+            let i = (0..epub.len() - name_at)
+                .find(|&i| {
+                    epub[i..].starts_with(sig)
+                        && epub[i + name_at..].starts_with(b"OEBPS/style.css")
+                })
+                .unwrap();
+            out.push(u16::from_le_bytes([epub[i + len_at], epub[i + len_at + 1]]));
+        }
+        out
+    };
+    let name_len = "OEBPS/style.css".len();
+    patch_headers(
+        &mut input,
+        "OEBPS/style.css",
+        30 + name_len,
+        46 + name_len,
+        &0x7875u16.to_le_bytes(),
+    );
+    assert_eq!(extra_lengths(&input), [9, 9]);
+    let c = convert(&input).unwrap();
+    assert_eq!(extra_lengths(&c.epub), [0, 0]);
+    assert_eq!(entry(&c.epub, "OEBPS/style.css"), "p { margin: 0 }");
 }

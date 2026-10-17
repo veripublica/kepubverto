@@ -21,6 +21,8 @@ crate-type = ["cdylib", "rlib"]
 kepubverto = { path = ".." }
 wasm-bindgen = "0.2"
 serde = { version = "1", features = ["derive"] }
-# Held at 0.5.6 as epubveri and epubsana hold it: 0.5.7 deprecates the
-# `#[tsify(into_wasm_abi)]` used here. Pin tsify and tsify-macros together.
+# Returned types cross the ABI as `tsify::Ts<T>`: the `#[tsify(into_wasm_abi)]`
+# used before is deprecated since 0.5.7 because it leaks memory (tsify issue
+# #65). epubveri (0.29.0) and epubsana made the same move. A `///` comment on
+# a returned type is copied verbatim into the published `.d.ts`.
 tsify = { version = "0.5", features = ["js"] }

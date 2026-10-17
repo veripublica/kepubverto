@@ -103,6 +103,17 @@ check "builds against the declared minimum epubveri ($MIN)" \
   bash -c "cargo update -q -p epubveri --precise '$MIN' && cargo check -q --workspace"
 cp "${TMPDIR:-/tmp}/kepubverto-preflight.lock" Cargo.lock
 
+# CI's `audit` job runs on the push, which races the tag, and its verdict
+# depends on the advisory database, not on our tree: three zip 8 advisories
+# entered it after 0.2.0 with nothing here changing. epubveri and epubsana
+# added the same check (2026-10-17). A missing cargo-audit is a failure, not a
+# skip.
+if command -v cargo-audit >/dev/null; then
+  check "cargo audit (advisory database fetched now)" cargo audit --file Cargo.lock
+else
+  bad "cargo audit is not installed: cargo install cargo-audit --locked"
+fi
+
 MSRV=$(grep -m1 '^rust-version' Cargo.toml | cut -d'"' -f2)
 if rustup run "$MSRV" rustc -V >/dev/null 2>&1; then
   check "compiles at the MSRV ($MSRV)" rustup run "$MSRV" cargo check --workspace --locked

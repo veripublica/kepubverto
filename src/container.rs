@@ -9,9 +9,10 @@
 use std::collections::BTreeMap;
 use std::io::{Cursor, Read, Write};
 
+use flate2::read::DeflateDecoder;
 use roxmltree::{Document, ParsingOptions};
 use zip::write::SimpleFileOptions;
-use zip::{CompressionMethod, ZipArchive, ZipWriter};
+use zip::{CompressionMethod, DateTime, ZipArchive, ZipReadOptions, ZipWriter};
 
 use crate::Error;
 
@@ -55,16 +56,10 @@ impl<'a> Container<'a> {
         let Some(i) = self.zip.index_for_name(name) else {
             return Ok(None);
         };
-        let mut f = self
-            .zip
-            .by_index(i)
-            .map_err(|e| Error::Unreadable(name.to_string(), e.to_string()))?;
-        let mut data = Vec::new();
         // One byte past the cap, so an entry whose header understates its size
         // is caught by what it actually inflates to.
-        (&mut f)
-            .take(MAX_ENTRY_BYTES + 1)
-            .read_to_end(&mut data)
+        let data = self
+            .inflate(i, MAX_ENTRY_BYTES + 1)
             .map_err(|e| Error::Unreadable(name.to_string(), e.to_string()))?;
         if data.len() as u64 > MAX_ENTRY_BYTES {
             return Err(Error::TooLarge(format!(
@@ -82,14 +77,61 @@ impl<'a> Container<'a> {
         Ok(Some(data))
     }
 
+    /// Entry `index`'s contents, at most `limit` bytes of them, read the way
+    /// epubveri and epubsana read them. Stored and deflated entries are
+    /// inflated here from their raw bytes: zip 9 bounds every read by the size
+    /// the header declares (zip-rs/zip2#1022) and checks the CRC, so a book
+    /// epubcheck accepts, with one entry longer than its header says or with a
+    /// wrong CRC, would fail to convert. Anything else (another method, an
+    /// encrypted entry) goes through zip's own reader, which refuses it as
+    /// before.
+    fn inflate(&mut self, index: usize, limit: u64) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+        let mut data = Vec::new();
+        let raw = self.zip.by_index_raw(index)?;
+        if !raw.encrypted() {
+            match raw.compression() {
+                CompressionMethod::Stored => {
+                    raw.take(limit).read_to_end(&mut data)?;
+                    return Ok(data);
+                }
+                CompressionMethod::Deflated => {
+                    DeflateDecoder::new(raw)
+                        .take(limit)
+                        .read_to_end(&mut data)?;
+                    return Ok(data);
+                }
+                _ => {}
+            }
+        }
+        drop(raw);
+        let options = ZipReadOptions::new().ignore_crc32(true);
+        self.zip
+            .by_index_with_options(index, options)?
+            .take(limit)
+            .read_to_end(&mut data)?;
+        Ok(data)
+    }
+
     /// Write the container again, with `changed` entries replaced.
     pub fn write(mut self, changed: &BTreeMap<String, Vec<u8>>) -> Result<Vec<u8>, Error> {
         let io = |e: zip::result::ZipError| Error::Write(e.to_string());
         let mut out = ZipWriter::new(Cursor::new(Vec::new()));
         for i in 0..self.zip.len() {
             let f = self.zip.by_index_raw(i).map_err(io)?;
-            let Some(data) = changed.get(f.name()) else {
-                out.raw_copy_file(f).map_err(io)?;
+            let name = f.name().map_err(io)?.into_owned();
+            let Some(data) = changed.get(&name) else {
+                // Not `raw_copy_file`: since zip 9 it writes the central
+                // directory's extra fields into the local header too, which
+                // can give `mimetype` a local extra field it never had
+                // (PKG-005), and refuses an Info-ZIP Unix field (0x7875)
+                // outright. `_touch` with the entry's own time copies what
+                // zip 8's `raw_copy_file` did: no extra field, either header.
+                // epubsana does the same.
+                let time = f
+                    .last_modified()
+                    .filter(DateTime::is_valid)
+                    .unwrap_or_else(DateTime::default_for_write);
+                out.raw_copy_file_touch(f, time, None).map_err(io)?;
                 continue;
             };
             let method = match f.compression() {
@@ -103,7 +145,6 @@ impl<'a> Container<'a> {
             if let Some(mode) = f.unix_mode() {
                 opts = opts.unix_permissions(mode);
             }
-            let name = f.name().to_string();
             drop(f);
             out.start_file(name, opts).map_err(io)?;
             out.write_all(data)
