@@ -374,6 +374,10 @@ differs is the metadata of entries copied unchanged, which now keeps the
 "made by" system and file attributes of the input (zip 8 rewrote them as
 Unix ones).
 
+The epubveri 0.30.0 move (2026-10-18, for 0.2.2), all 562 books with
+`--format json`: the converted book, the report, stderr and the exit code
+are byte for byte 0.2.1's, so the findings and spans above stand.
+
 ## What kepubverto does not do (in this version)
 
 kepubify also changes things this version leaves alone:
