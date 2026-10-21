@@ -1,6 +1,6 @@
 [package]
 name = "kepubverto"
-version = "0.2.2"
+version = "0.2.3"
 edition = "2024"
 rust-version = "1.88"
 description = "Converts EPUB to KEPUB for Kobo e-readers, in pure Rust, without making the book worse."
@@ -24,7 +24,7 @@ members = ["kepubverto-wasm"]
 # the `envelope` types for `--format json`. epubveri does not validate
 # anything at run time here (docs/SPANS.md, "How never make a book worse is
 # kept").
-epubveri = "0.30.0"
+epubveri = "0.31.0"
 # Pure Rust: the "deflate" feature uses zlib-rs; bzip2/zstd (C) stay disabled.
 # The family shares one zip major. 9.0.4 is the floor epubveri tested; below
 # 9.0.0, RUSTSEC-2026-0367/0368/0369 apply.

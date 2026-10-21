@@ -8,6 +8,16 @@ kepubverto is pre-1.0, so breaking changes land as minor-version bumps
 (`0.x.0`), per [Cargo's SemVer compatibility
 rules](https://doc.rust-lang.org/cargo/reference/semver.html).
 
+## [0.2.3] - 2026-10-21
+
+### Changed
+
+- epubveri 0.31.0 (was 0.30.0), which moves to styloria 0.15. kepubverto
+  uses none of what changed (stylesheet decoding and `url()` scans in
+  `css`, a new `NEXT-018` id): on all 562 shelf books, with no option and
+  with `--hyphens auto` and `none`, the converted book, the JSON report,
+  stderr and the exit code are byte for byte those of 0.2.2.
+
 ## [0.2.2] - 2026-10-18
 
 ### Changed

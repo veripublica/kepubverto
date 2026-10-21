@@ -378,6 +378,12 @@ The epubveri 0.30.0 move (2026-10-18, for 0.2.2), all 562 books with
 `--format json`: the converted book, the report, stderr and the exit code
 are byte for byte 0.2.1's, so the findings and spans above stand.
 
+The epubveri 0.31.0 move (2026-10-21, for 0.2.3), all 562 books with no
+option, `--hyphens auto` and `none`, in both `--format`s: the converted
+book, the report, stderr and the exit code are byte for byte 0.2.2's. The
+shelf A/B graded by epubveri 0.31.0 (no option): findings added 0 at every
+severity, spans identical to kepubify's in the same 543.
+
 ## What kepubverto does not do (in this version)
 
 kepubify also changes things this version leaves alone:
