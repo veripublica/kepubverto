@@ -43,7 +43,8 @@ The conversion changes three things in an XHTML content document:
 3. It appends one `<style>` element to `<head>`.
 
 With `--hyphens`, it appends a second `<style>` element after that one
-([Hyphenation](#hyphenation---hyphens)). Nothing else is optional.
+([Hyphenation](#hyphenation---hyphens)), and with `--css`, one more after
+that ([Extra CSS](#extra-css---css)). Nothing else is optional.
 
 Every byte of the original document that is not one of these insertions is
 written out unchanged. kepubverto does not re-serialize documents: the XML
@@ -319,6 +320,66 @@ day, 562 books (the 544 plus 18 added since), epubveri 0.28.0: findings added
 0 at every severity with no option, `--hyphens auto` and `--hyphens none`
 alike, and the spans the same in all three.
 
+## Extra CSS (`--css`)
+
+Off unless asked for. `--css <CSS>` adds the user's CSS to every converted
+content document; it can be given more than once. All the values go into one
+`<style>` element, appended to `<head>` after the style rule and the
+hyphenation rule, so the user's CSS comes last in the cascade. The element
+takes the form the EPUB version allows, as for hyphenation: `<style>` in
+EPUB 3, `<style type="text/css">` in EPUB 2.
+
+The text written is not the argument's bytes. Each value is parsed by
+[styloria](https://crates.io/crates/styloria) and written back with
+`serialize_stylesheet_for_xml`: the same CSS in styloria's compact form
+(`p { text-indent: 1em }` becomes `p {text-indent:1em;}`), with comments
+dropped, and `<` and `&` inside strings,
+identifiers and urls written as CSS escapes (`\3c `, `\26 `). The result
+holds no `<`, no `&` and no `]]>`, so it is the same text to an XML parser and
+to an HTML one, and no escaping of the XML kind is needed (a reader that parsed
+the document as HTML would see `&lt;` as four characters). The values are
+joined with a line feed, in the order they were given.
+
+A value is refused, and nothing is converted (exit 2), when:
+
+- **It cannot be written that way.** A `<` or `&` that is CSS syntax rather
+  than text (a media-query range `(width < 600px)`, the nesting selector
+  `&`), a `<!--` inside a rule, or `]]>` spelled by tokens. The message gives
+  the line and column in the value.
+- **It names a url** (`url()`, `src()`, `@import`, `image-set()`). The same
+  text goes into documents in different folders, where a relative url
+  resolves to different files, and kepubverto adds no resources to the book.
+- **It has `@font-face`.** A font has to come from the book or the device; a
+  url is refused above, and a font the device has is used by its name in
+  `font-family`, with no `@font-face`. epubveri also notes every non-empty
+  `@font-face` (CSS-028, usage), which would add a finding.
+- **It would add a finding.** The value is checked with
+  `epubveri::check_style_text`, by the rules epubveri applies to a `<style>`
+  in the book's EPUB version, advisory checks included: a syntax error
+  (CSS-008), `position: fixed` (CSS-006), a property EPUB 3 flags (CSS-001), a
+  property nobody defines or a value that cannot fit its grammar (ADV-*).
+  Every finding is shown, located at `--css` with its line and column. The
+  serialized text is checked the same way before it is written.
+- **It is empty**, or holds only whitespace and comments.
+
+This checks the argument, not the book: kepubverto still does not validate
+books. The check needs the EPUB version (EPUB 3 flags `direction`, EPUB 2
+does not), so it runs once the package document is read, before any document
+is converted.
+
+The element is not appended when `<head>` already has a `<style>` whose text
+is exactly the one this run would write, as with the other two, so a document
+converted twice gets it once. A document that is already converted (it has a
+`koboSpan`) is left as it is: to change a book's extra CSS, convert the
+original EPUB.
+
+kepubify's `--css` *(oracle, 2026-10-22)* writes each value raw, in its own
+`<style type="text/css" class="kepubify-extracss">`, in both versions: an
+error in every EPUB 2 document ([The style rule](#the-style-rule)), a usage
+finding in every EPUB 3 one, a document that is no longer well-formed when the
+CSS holds `&` (even in a comment), and markup injected when it holds
+`</style>`.
+
 ## How "never make a book worse" is kept
 
 kepubverto converts. It does not validate. Checking a book belongs to
@@ -331,7 +392,7 @@ The promise that a valid book stays valid therefore rests on how the
 conversion is built and tested, not on a check at run time:
 
 - **By construction.** Documents are read as XML, and only the three
-  insertions above are made (four with `--hyphens`). Every other byte is kept. The rules skip every
+  insertions above are made (four with `--hyphens`, one more with `--css`). Every other byte is kept. The rules skip every
   place where a `span` would be invalid, and any document where an added id
   would collide. A document that cannot be read is left as it was.
 - **On every commit.** CI converts a fixture set (public-domain books and
@@ -383,6 +444,13 @@ option, `--hyphens auto` and `none`, in both `--format`s: the converted
 book, the report, stderr and the exit code are byte for byte 0.2.2's. The
 shelf A/B graded by epubveri 0.31.0 (no option): findings added 0 at every
 severity, spans identical to kepubify's in the same 543.
+
+The `--css` run (2026-10-23, unreleased), all 562 books, epubveri 0.33.0
+(styloria 0.16.1), every severity, usage included: findings added 0 with no
+option and 0 with `--hyphens auto` plus two `--css` values (one with `<` and
+`&` in a string, one with `!important`); spans identical to kepubify's in the
+same 543 in both. With no option, the converted book, stderr and the exit
+code are byte for byte 0.2.3's in every book.
 
 ## What kepubverto does not do (in this version)
 

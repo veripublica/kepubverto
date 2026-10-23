@@ -163,7 +163,10 @@ fn the_unmarked_epub2_style_is_not_added_again() {
 }
 
 fn with_hyphens(h: Hyphens) -> Options {
-    Options { hyphens: Some(h) }
+    Options {
+        hyphens: Some(h),
+        ..Default::default()
+    }
 }
 
 #[test]
@@ -204,6 +207,84 @@ fn the_hyphens_rule_is_not_added_again() {
         let twice = convert_with(&once.epub, &with_hyphens(h)).unwrap();
         assert_eq!(twice.documents[0].outcome, Outcome::NothingToDo);
     }
+}
+
+fn with_css(css: &[&str]) -> Options {
+    Options {
+        css: css.iter().map(|c| c.to_string()).collect(),
+        ..Default::default()
+    }
+}
+
+#[test]
+fn css_comes_last_in_one_style_element() {
+    let auto = kepubverto::content::HYPHENS_AUTO;
+    let options = Options {
+        hyphens: Some(Hyphens::Auto),
+        css: vec!["p { text-indent: 1.5em }".into(), "h1 { margin: 0 }".into()],
+    };
+    let epub3 = book(true, &[&page(EPUB3_HEAD, "<p>x</p>")]);
+    let out = entry(
+        &convert_with(&epub3, &options).unwrap().epub,
+        "OEBPS/Text/c0.xhtml",
+    );
+    assert!(
+        out.contains(&format!(
+            "{STYLE}<style>{auto}</style><style>p {{text-indent:1.5em;}}\nh1 {{margin:0;}}</style></head>"
+        )),
+        "{out}"
+    );
+
+    let epub2 = book(false, &[&page(EPUB2_HEAD, "<p>x</p>")]);
+    let out = entry(
+        &convert_with(&epub2, &with_css(&["p { margin: 0 }"]))
+            .unwrap()
+            .epub,
+        "OEBPS/Text/c0.xhtml",
+    );
+    assert!(
+        out.contains(&format!(
+            "{STYLE_EPUB2}<style type=\"text/css\">p {{margin:0;}}</style></head>"
+        )),
+        "{out}"
+    );
+}
+
+#[test]
+fn the_css_is_not_added_again() {
+    let doc = page(EPUB3_HEAD, "<hr/>");
+    let options = with_css(&["p { margin: 0 }"]);
+    let once = convert_with(&book(true, &[&doc]), &options).unwrap();
+    let twice = convert_with(&once.epub, &options).unwrap();
+    assert_eq!(twice.documents[0].outcome, Outcome::NothingToDo);
+}
+
+#[test]
+fn a_refused_css_value_converts_nothing() {
+    let epub = book(true, &[&page(EPUB3_HEAD, "<p>x</p>")]);
+    for css in [
+        "body { background: url(bg.png) }",
+        "@font-face { font-family: X; src: local(Georgia) }",
+        "p { position: fixed }",
+        "@media (width < 600px) { p { margin: 0 } }",
+        "",
+    ] {
+        match convert_with(&epub, &with_css(&[css])) {
+            Err(kepubverto::Error::Css(e)) => assert_eq!(e.value, 1, "{css}"),
+            other => panic!("{css}: {other:?}"),
+        }
+    }
+}
+
+#[test]
+fn css_is_checked_by_the_books_version() {
+    // EPUB 3 flags `direction` (CSS-001); EPUB 2 does not.
+    let options = with_css(&["p { direction: rtl }"]);
+    assert!(convert_with(&book(false, &[&page(EPUB2_HEAD, "<p>x</p>")]), &options).is_ok());
+    assert!(matches!(
+        convert_with(&book(true, &[&page(EPUB3_HEAD, "<p>x</p>")]), &options),
+        Err(kepubverto::Error::Css(_))
+    ));
 }
 
 #[test]

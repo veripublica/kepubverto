@@ -137,7 +137,33 @@ fn a_valid_epub2_stays_valid() {
 fn hyphens_keeps_a_valid_book_valid() {
     for epub3 in [true, false] {
         for h in [kepubverto::Hyphens::Auto, kepubverto::Hyphens::None] {
-            stays_valid(epub3, kepubverto::Options { hyphens: Some(h) });
+            stays_valid(
+                epub3,
+                kepubverto::Options {
+                    hyphens: Some(h),
+                    ..Default::default()
+                },
+            );
         }
+    }
+}
+
+/// `--css` with what a user might write, markup characters in its text
+/// included, in both versions: the element and its CSS add no finding.
+#[test]
+fn css_keeps_a_valid_book_valid() {
+    let css = vec![
+        "p { text-indent: 1.5em; margin: 0 }".to_string(),
+        r#"blockquote::before { content: "<< & >>" } /* a & b < c */"#.to_string(),
+        "@media (max-width: 600px) { h1 { font-size: 1.2em !important } }".to_string(),
+    ];
+    for epub3 in [true, false] {
+        stays_valid(
+            epub3,
+            kepubverto::Options {
+                hyphens: Some(kepubverto::Hyphens::Auto),
+                css: css.clone(),
+            },
+        );
     }
 }

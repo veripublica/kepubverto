@@ -139,6 +139,15 @@ fn a_refusal_or_a_usage_error_prints_no_envelope() {
         vec!["-i", i, "--format", "json"], // output exists, no -f
         vec!["-i", i, "-o", i, "-f", "--format", "json"], // output = input
         vec!["-i", i, "--format", "json", "--hyphens", "sometimes"], // usage error
+        vec![
+            "-i",
+            i,
+            "-f",
+            "--format",
+            "json",
+            "--css",
+            "p { position: fixed }",
+        ], // refused css
     ] {
         let out = run(&args);
         assert_eq!(out.status.code(), Some(2), "{args:?}");
@@ -153,4 +162,26 @@ fn help_claims_convention_0_7() {
     let help = String::from_utf8(out.stdout).unwrap();
     assert!(help.contains("Conforms to veripublica conventions v0.7."));
     assert!(help.contains("--format <FORMAT>"));
+}
+
+#[test]
+fn a_refused_css_writes_nothing_and_says_why() {
+    let d = dir("css-refused");
+    let input = d.join("book.epub");
+    std::fs::write(&input, book(&["<p>x</p>"])).unwrap();
+    let i = input.to_str().unwrap();
+    let out = run(&[
+        "-i",
+        i,
+        "--css",
+        "p { margin: 0 }",
+        "--css",
+        "a { background: url(x.png) }",
+    ]);
+    assert_eq!(out.status.code(), Some(2));
+    assert!(!d.join("book.kepub.epub").exists());
+    assert_eq!(
+        String::from_utf8_lossy(&out.stderr),
+        "error: --css value 2: line 1, column 17: refers to 'x.png'; extra CSS cannot refer to files\n"
+    );
 }

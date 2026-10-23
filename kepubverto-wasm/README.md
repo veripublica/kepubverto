@@ -31,10 +31,15 @@ const r = convert(new Uint8Array(await file.arrayBuffer()));
 
 // The CLI's --hyphens: "auto" turns hyphenation on, "none" off.
 convert(bytes, "auto");
+
+// The CLI's --css, one string per value: CSS added after kepubverto's own.
+convert(bytes, undefined, ["p { text-indent: 1.5em }"]);
 ```
 
-`convert` throws when the file cannot be read as an EPUB at all, and on a
-`hyphens` value other than `"auto"` or `"none"`.
+`convert` throws when the file cannot be read as an EPUB at all, on a
+`hyphens` value other than `"auto"` or `"none"`, and on a refused `css` value
+(it refers to a file, has `@font-face`, or would add a finding epubveri
+reports); the message starts `extra CSS:` and says why.
 
 ## License
 

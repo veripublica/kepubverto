@@ -36,6 +36,11 @@ OPTIONS:
                             headings, table cells and the book's own
                             per-element choices alone; none overrides the
                             book. Without it, the book decides.
+        --css <CSS>         Add this CSS to every converted document, after
+                            kepubverto's own rules; repeat it to add more.
+                            Refused (exit 2, nothing written) if it refers to a
+                            file, has @font-face, or would add a finding
+                            epubveri reports.
         --format <FORMAT>   Report format: human (the default), or json: the
                             shared machine envelope (one JSON object on stdout,
                             see the veripublica FORMATS spec).
@@ -45,6 +50,7 @@ OPTIONS:
 EXAMPLES:
     kepubverto -i book.epub                 # writes book.kepub.epub
     kepubverto -i book.epub --hyphens auto  # also hyphenate
+    kepubverto -i book.epub --css 'p { text-indent: 1.5em }'
     kepubverto -i book.epub -o out.kepub.epub -f
 
 The original is never modified in place, and an existing output file is never
@@ -55,9 +61,9 @@ EXIT CODES:
     0   every content document was converted (or already had been).
     1   the book was written, but some content documents could not be
         converted and were left as they were; each is named on stderr.
-    2   kepubverto could not run: a usage error, an unreadable EPUB, an output
-        path that is the input, an existing output file without -f, or an I/O
-        failure. With --format json, an EPUB that cannot be read or a book that
+    2   kepubverto could not run: a usage error, a refused --css, an unreadable
+        EPUB, an output path that is the input, an existing output file
+        without -f, or an I/O failure. With --format json, an EPUB that cannot be read or a book that
         cannot be written is still described in the envelope; the rest print
         no envelope.
 
@@ -86,6 +92,7 @@ struct Run {
     output: Option<String>,
     force: bool,
     hyphens: Option<Hyphens>,
+    css: Vec<String>,
     json: bool,
 }
 
@@ -102,6 +109,7 @@ fn parse(args: &[String]) -> Cli {
     let mut output: Option<String> = None;
     let mut format: Option<String> = None;
     let mut hyphens: Option<String> = None;
+    let mut css: Vec<String> = Vec::new();
     let mut force = false;
     let mut help = false;
     let mut version = false;
@@ -137,7 +145,7 @@ fn parse(args: &[String]) -> Cli {
                 "help" => help = true,
                 "version" => version = true,
                 "force" => force = true,
-                "input" | "output" | "format" | "hyphens" => {
+                "input" | "output" | "format" | "hyphens" | "css" => {
                     let value = match attached {
                         Some(v) => v,
                         None => {
@@ -156,6 +164,7 @@ fn parse(args: &[String]) -> Cli {
                         "output" => set_single!(output, "--output", value),
                         "format" => set_single!(format, "--format", value),
                         "hyphens" => set_single!(hyphens, "--hyphens", value),
+                        "css" => css.push(value),
                         _ => unreachable!(),
                     }
                 }
@@ -246,6 +255,7 @@ fn parse(args: &[String]) -> Cli {
             output,
             force,
             hyphens,
+            css,
             json,
         }),
         n => Cli::Usage(format!(
@@ -324,9 +334,14 @@ fn execute(run: &Run) -> Result<ExitCode, Stop> {
 
     let options = Options {
         hyphens: run.hyphens,
+        css: run.css.clone(),
     };
-    let conversion = kepubverto::convert_with(&bytes, &options)
-        .map_err(|e| Stop::Input(format!("cannot convert {}: {e}", run.input)))?;
+    let conversion = kepubverto::convert_with(&bytes, &options).map_err(|e| match e {
+        // The argument is at fault, not the book: no envelope, as for any
+        // other usage error.
+        kepubverto::Error::Css(e) => Stop::Refused(e.to_string()),
+        e => Stop::Input(format!("cannot convert {}: {e}", run.input)),
+    })?;
     std::fs::write(&out, &conversion.epub)
         .map_err(|e| Stop::Input(format!("cannot write {}: {e}", out.display())))?;
 
@@ -608,6 +623,24 @@ mod tests {
         assert_eq!(
             parse_str(&["-i", "a.epub", "--hyphens"]),
             Cli::Usage("option '--hyphens' needs a value".into())
+        );
+    }
+
+    #[test]
+    fn css_can_be_given_more_than_once() {
+        assert_eq!(run_of(&["-i", "a.epub"]).css, Vec::<String>::new());
+        assert_eq!(
+            run_of(&["-i", "a.epub", "--css", "p {}", "--css=h1 {}"]).css,
+            vec!["p {}".to_string(), "h1 {}".to_string()]
+        );
+        assert_eq!(
+            parse_str(&["-i", "a.epub", "--css"]),
+            Cli::Usage("option '--css' needs a value".into())
+        );
+        // kepubify's short flag is not accepted (§3.2).
+        assert_eq!(
+            parse_str(&["-i", "a.epub", "-c", "p {}"]),
+            Cli::Usage("unexpected option '-c'".into())
         );
     }
 

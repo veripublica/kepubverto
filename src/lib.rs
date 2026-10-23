@@ -2,7 +2,8 @@
 //!
 //! The conversion wraps text and images in `koboSpan` elements, wraps each
 //! body in two divs and adds one style rule (docs/SPANS.md). On request it
-//! also sets hyphenation on or off ([`Options::hyphens`]). Span ids match
+//! also sets hyphenation on or off ([`Options::hyphens`]) and adds the
+//! caller's CSS ([`Options::css`]). Span ids match
 //! kepubify's, so reading positions and highlights survive a switch. Unlike a
 //! converter that re-serializes, kepubverto inserts its markup at byte
 //! offsets: every other byte of a document stays as it was, and entries the
@@ -22,11 +23,13 @@
 
 pub mod container;
 pub mod content;
+mod css;
 mod segment;
 
 use std::collections::BTreeMap;
 
 pub use content::{Hyphens, Outcome, Reason, codes};
+pub use css::{CssError, CssFinding, CssReason};
 
 /// The crate version, with `+<git hash>[.dirty]` when built from a checkout.
 pub const VERSION: &str = concat!(env!("CARGO_PKG_VERSION"), env!("KEPUBVERTO_BUILD"));
@@ -42,6 +45,8 @@ pub enum Error {
     Unreadable(String, String),
     /// The converted container could not be written.
     Write(String),
+    /// An [`Options::css`] value was refused. Nothing was converted.
+    Css(CssError),
 }
 
 impl std::fmt::Display for Error {
@@ -50,6 +55,7 @@ impl std::fmt::Display for Error {
             Error::NotAnEpub(why) | Error::TooLarge(why) => f.write_str(why),
             Error::Unreadable(name, why) => write!(f, "cannot read {name}: {why}"),
             Error::Write(why) => write!(f, "cannot write the converted book: {why}"),
+            Error::Css(e) => e.fmt(f),
         }
     }
 }
@@ -110,6 +116,12 @@ pub struct Options {
     /// Append a rule that sets hyphenation on or off in every converted
     /// document (the CLI's `--hyphens`). `None` leaves it to the book.
     pub hyphens: Option<Hyphens>,
+    /// CSS to append to every converted document, in this order, in one
+    /// `<style>` after the others (the CLI's `--css`; docs/SPANS.md, "Extra
+    /// CSS"). A value that cannot be written safely, refers to a file, has
+    /// `@font-face` or would add an epubveri finding is refused with
+    /// [`Error::Css`] before any document is converted.
+    pub css: Vec<String>,
 }
 
 /// Convert an EPUB with the default [`Options`]. A content document that
@@ -126,6 +138,7 @@ pub fn convert(epub: &[u8]) -> Result<Conversion, Error> {
 /// let book = std::fs::read("book.epub")?;
 /// let options = kepubverto::Options {
 ///     hyphens: Some(kepubverto::Hyphens::Auto),
+///     css: vec!["p { text-indent: 1.5em }".to_string()],
 /// };
 /// let conversion = kepubverto::convert_with(&book, &options)?;
 /// # Ok::<(), Box<dyn std::error::Error>>(())
@@ -133,6 +146,12 @@ pub fn convert(epub: &[u8]) -> Result<Conversion, Error> {
 pub fn convert_with(epub: &[u8], options: &Options) -> Result<Conversion, Error> {
     let mut c = container::Container::open(epub)?;
     let package = container::package(&mut c)?;
+    // The values are checked by the book's version's rules, so only now.
+    let css = if options.css.is_empty() {
+        None
+    } else {
+        Some(css::prepare(&options.css, package.epub3).map_err(Error::Css)?)
+    };
     let mut changed = BTreeMap::new();
     let mut documents = Vec::with_capacity(package.documents.len());
     for (path, media_type) in package.documents {
@@ -141,7 +160,8 @@ pub fn convert_with(epub: &[u8], options: &Options) -> Result<Conversion, Error>
         } else {
             match c.read(&path) {
                 Ok(Some(bytes)) => {
-                    let (outcome, out) = content::convert(&bytes, package.epub3, options.hyphens);
+                    let (outcome, out) =
+                        content::convert(&bytes, package.epub3, options.hyphens, css.as_deref());
                     if let Some(out) = out {
                         changed.insert(path.clone(), out);
                     }

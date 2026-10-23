@@ -26,7 +26,9 @@ rule by rule. In short, in each XHTML content document it:
 - adds one `<style>` rule to the head.
 
 On request (`--hyphens auto` or `none`) it also adds CSS that turns
-hyphenation on or off.
+hyphenation on or off, and (`--css`) CSS of your own: checked first, and
+refused if it refers to a file, has `@font-face`, or would add a finding
+epubveri reports.
 
 ## Why another converter
 
@@ -94,6 +96,9 @@ kepubverto -i book.epub
 # Hyphenate (the reader's dictionary for the book's language breaks the words);
 # --hyphens none turns hyphenation off even where the book's CSS turns it on:
 kepubverto -i book.epub --hyphens auto
+
+# Add your own CSS, after kepubverto's rules (repeat --css for more):
+kepubverto -i book.epub --css 'p { text-indent: 1.5em; margin: 0 }'
 
 # Choose the output, and replace it if it exists:
 kepubverto -i book.epub -o out/book.kepub.epub -f
@@ -168,7 +173,8 @@ stderr.
 | `--add-dummy-titlepage`, `--no-add-dummy-titlepage` | never adds one (kepubify adds one when a heuristic says so) |
 | `--hyphenate` | `--hyphens auto` |
 | `--no-hyphenate` | `--hyphens none` |
-| `--smarten-punctuation`, `-c, --css`, `--fullscreen-reading-fixes`, `-r, --replace`, `--charset` | not yet; each will come in its own release |
+| `-c, --css` | `--css` (no short flag); refused if it refers to a file, has `@font-face` or would add a finding |
+| `--smarten-punctuation`, `--fullscreen-reading-fixes`, `-r, --replace`, `--charset` | not yet; each will come in its own release |
 | `-v, --verbose` | not yet |
 | `--version` | `-V, --version` |
 
@@ -184,7 +190,8 @@ std::fs::write("book.kepub.epub", &conversion.epub)?;
 ```
 
 `kepubverto::convert_with(&book, &options)` takes `Options`, where
-`hyphens: Some(Hyphens::Auto)` is the CLI's `--hyphens auto`.
+`hyphens: Some(Hyphens::Auto)` is the CLI's `--hyphens auto` and `css` holds
+the `--css` values; a refused value is `Error::Css`.
 `kepubverto-wasm` exposes the same conversion to JavaScript for the browser.
 
 ## License

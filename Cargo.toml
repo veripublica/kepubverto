@@ -23,8 +23,14 @@ members = ["kepubverto-wasm"]
 # entity declaration (`htm::declare_dtd_entities`, public since 0.21.1), and
 # the `envelope` types for `--format json`. epubveri does not validate
 # anything at run time here (docs/SPANS.md, "How never make a book worse is
-# kept").
-epubveri = "0.31.0"
+# kept"). A fourth, since 0.33.0: `check_style_text` and `style_text_urls`
+# grade the `--css` argument (not the book) by the rules epubveri applies to
+# a `<style>` (docs/SPANS.md, "Extra CSS").
+epubveri = "0.33.0"
+# Writes `--css` back as text an XHTML `<style>` can hold as it stands
+# (`serialize_stylesheet_for_xml`, new in 0.16). One styloria in the lock: the
+# requirement follows epubveri's own, as epubsana's does.
+styloria = "0.16.1"
 # Pure Rust: the "deflate" feature uses zlib-rs; bzip2/zstd (C) stay disabled.
 # The family shares one zip major. 9.0.4 is the floor epubveri tested; below
 # 9.0.0, RUSTSEC-2026-0367/0368/0369 apply.

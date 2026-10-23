@@ -8,6 +8,31 @@ kepubverto is pre-1.0, so breaking changes land as minor-version bumps
 (`0.x.0`), per [Cargo's SemVer compatibility
 rules](https://doc.rust-lang.org/cargo/reference/semver.html).
 
+## [Unreleased]
+
+### Added
+
+- `--css <CSS>` (library: `Options::css`), repeatable: adds the user's CSS
+  to every converted document, in one `<style>` after the style rule and
+  the hyphenation rule, in the form the EPUB version allows. The values
+  are written back by styloria's `serialize_stylesheet_for_xml`, so the
+  element holds no `<`, `&` or `]]>`. A value is refused (exit 2, nothing
+  written; `Error::Css` in the library) when it cannot be written that way,
+  refers to a file, has `@font-face`, holds no CSS, or would add a finding:
+  it is checked with epubveri's `check_style_text` by the book's EPUB
+  version, advisory checks included. kepubify's `-c` is not accepted.
+  docs/SPANS.md, "Extra CSS".
+- kepubverto-wasm: `convert(epub, hyphens, css)` takes the `--css` values
+  as a third, optional argument; a refused value throws `extra CSS: …`.
+  The web page has an "Extra CSS" box.
+- `CssReason` displays the reason alone, without the value number.
+
+### Changed
+
+- epubveri 0.33.0 (was 0.31.0), for `check_style_text`; styloria 0.16.1
+  is now a direct dependency, at epubveri's own requirement.
+- `content::convert` takes the extra CSS as a fourth argument.
+
 ## [0.2.3] - 2026-10-21
 
 ### Changed

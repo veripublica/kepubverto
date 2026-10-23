@@ -20,6 +20,17 @@
     <style>
       .actionbar { display: flex; gap: .75rem; align-items: center; flex-wrap: wrap; margin: 1rem 0; }
       td.path { word-break: break-all; }
+      #status { white-space: pre-line; } /* a refused CSS lists its findings, one per line */
+      /* Extra CSS: the textarea takes button/select's shape from demo.css. */
+      .cssopt { margin: 0 0 1rem; }
+      .cssopt label { display: block; font-size: .85rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-bottom: .35rem; }
+      .cssopt textarea {
+        display: block; box-sizing: border-box; width: 100%; min-height: 4.5rem; resize: vertical;
+        font: .85rem/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        border: 1px solid var(--border); background: var(--card); color: var(--fg);
+        border-radius: 8px; padding: .45rem .6rem;
+      }
+      .cssopt p { margin: .35rem 0 0; font-size: .8rem; color: var(--muted); }
     </style>
   </head>
   <body>
@@ -63,6 +74,12 @@
           <option value="auto">on</option>
           <option value="none">off</option>
         </select>
+      </div>
+
+      <div class="cssopt">
+        <label for="css">Extra CSS</label>
+        <textarea id="css" spellcheck="false" placeholder="p { text-indent: 1.5em; margin: 0 }"></textarea>
+        <p>Added to every converted document, after kepubverto's own rules. Refused if it refers to a file, has <code>@font-face</code>, or would add a finding epubveri reports.</p>
       </div>
 
       <label class="drop" id="drop">
@@ -182,8 +199,14 @@
         statusEl.textContent = "Converting " + file.name + "…";
         let r;
         try {
-          // "" = leave hyphenation to the book (the CLI without --hyphens).
-          r = convert(new Uint8Array(await file.arrayBuffer()), $("hyphens").value || undefined);
+          // "" = leave hyphenation to the book (the CLI without --hyphens);
+          // an empty box = no extra CSS (the CLI without --css).
+          const css = $("css").value.trim();
+          r = convert(
+            new Uint8Array(await file.arrayBuffer()),
+            $("hyphens").value || undefined,
+            css ? [css] : undefined,
+          );
         } catch (e) {
           statusEl.textContent = "Could not convert " + file.name + ": " + (e.message || e);
           return;
@@ -236,6 +259,10 @@
       });
 
       $("hyphens").addEventListener("change", () => {
+        if (last) run(last);
+      });
+      // "change" fires when the box loses focus, not on every key.
+      $("css").addEventListener("change", () => {
         if (last) run(last);
       });
       fileEl.addEventListener("change", () => {

@@ -182,10 +182,17 @@ impl Reason {
 
 /// Convert one content document. `epub3` says which entity rules apply (an
 /// EPUB 2 document may use the XHTML DTD's named entities) and which form the
-/// added `<style>` elements take. `hyphens`, when set, appends its rule.
+/// added `<style>` elements take. `hyphens`, when set, appends its rule;
+/// `css`, when set, is the text of one more `<style>` after it, already made
+/// safe to write (the crate's `css` module).
 /// Returns the outcome, and the new bytes when the document was rewritten.
-pub fn convert(bytes: &[u8], epub3: bool, hyphens: Option<Hyphens>) -> (Outcome, Option<Vec<u8>>) {
-    match convert_text(bytes, epub3, hyphens) {
+pub fn convert(
+    bytes: &[u8],
+    epub3: bool,
+    hyphens: Option<Hyphens>,
+    css: Option<&str>,
+) -> (Outcome, Option<Vec<u8>>) {
+    match convert_text(bytes, epub3, hyphens, css) {
         Ok(Some((out, spans))) => (Outcome::Converted { spans }, Some(out.into_bytes())),
         Ok(None) => (Outcome::NothingToDo, None),
         Err(Stop::Already) => (Outcome::AlreadyConverted, None),
@@ -208,6 +215,7 @@ fn convert_text(
     bytes: &[u8],
     epub3: bool,
     hyphens: Option<Hyphens>,
+    css: Option<&str>,
 ) -> Result<Option<(String, usize)>, Stop> {
     // A document that cannot be read as UTF-8 XML, and whose first bytes say
     // it is in another encoding, is left alone for its encoding: the sniff is
@@ -281,20 +289,26 @@ fn convert_text(
     if let Some(head) = head
         && let Some(content) = content_range(&text, head.range())
     {
-        // Both at the end of <head>, in this order (the sort is stable).
+        // All at the end of <head>, in this order (the sort is stable).
         if !head.descendants().any(is_style_rule) {
             let style = if epub3 { STYLE_EPUB3 } else { STYLE_EPUB2 };
             w.edits.push(Edit::new(content.end, Order::Last, style));
         }
+        let open = if epub3 {
+            "<style>"
+        } else {
+            r#"<style type="text/css">"#
+        };
         if let Some(h) = hyphens
             && !head.descendants().any(is_hyphens_rule)
         {
-            let open = if epub3 {
-                "<style>"
-            } else {
-                r#"<style type="text/css">"#
-            };
             let style = format!("{open}{}</style>", h.rule());
+            w.edits.push(Edit::new(content.end, Order::Last, style));
+        }
+        if let Some(css) = css
+            && !head.descendants().any(|n| is_style_holding(n, css))
+        {
+            let style = format!("{open}{css}</style>");
             w.edits.push(Edit::new(content.end, Order::Last, style));
         }
     }
@@ -567,6 +581,11 @@ fn is_hyphens_rule(n: Node) -> bool {
     is_xhtml(n, "style")
         && n.text()
             .is_some_and(|t| matches!(t.trim(), HYPHENS_AUTO | HYPHENS_NONE))
+}
+
+/// The extra CSS is already there: a `<style>` holding exactly `css`.
+fn is_style_holding(n: Node, css: &str) -> bool {
+    is_xhtml(n, "style") && n.text().is_some_and(|t| t.trim() == css.trim())
 }
 
 fn is_div_with_id(n: Node, id: &str) -> bool {

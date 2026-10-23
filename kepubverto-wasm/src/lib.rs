@@ -8,6 +8,7 @@
 //! r.documents.filter((d) => d.outcome === "left_alone"); // and why, in d.reason
 //! const kepub = r.epub; // Uint8Array → download <name>.kepub.epub
 //! convert(bytes, "auto"); // the CLI's --hyphens auto ("none" turns it off)
+//! convert(bytes, undefined, ["p { text-indent: 1.5em }"]); // the CLI's --css
 //! ```
 
 use serde::Serialize;
@@ -56,17 +57,28 @@ pub struct Conversion {
 
 /// Convert an EPUB. `hyphens` mirrors the CLI's `--hyphens`: `"auto"` or
 /// `"none"` adds CSS that turns hyphenation on or off; leave it out to let the
-/// book decide. Throws on any other value, and when the book cannot be read
-/// at all.
+/// book decide. `css` mirrors `--css`, one string per value: CSS added to
+/// every converted document, after kepubverto's own. Throws on any other
+/// `hyphens` value, on a refused `css` value (the message says why, prefixed
+/// `extra CSS:`, plus `value N` when there are several), and when the book
+/// cannot be read at all.
 #[wasm_bindgen]
-pub fn convert(epub: &[u8], hyphens: Option<String>) -> Result<Ts<Conversion>, JsError> {
-    Ok(Ts::from_rust(&conversion(epub, hyphens)?)?)
+pub fn convert(
+    epub: &[u8],
+    hyphens: Option<String>,
+    css: Option<Vec<String>>,
+) -> Result<Ts<Conversion>, JsError> {
+    Ok(Ts::from_rust(&conversion(epub, hyphens, css)?)?)
 }
 
 // The body of `convert`, kept apart so a native test can read what it returns:
 // a `Ts<…>` holds a JavaScript value, which a native test cannot build. The
 // documentation is on `convert`, since that is what reaches the `.d.ts`.
-fn conversion(epub: &[u8], hyphens: Option<String>) -> Result<Conversion, JsError> {
+fn conversion(
+    epub: &[u8],
+    hyphens: Option<String>,
+    css: Option<Vec<String>>,
+) -> Result<Conversion, JsError> {
     let hyphens = match hyphens.as_deref() {
         None => None,
         Some("auto") => Some(kepubverto::Hyphens::Auto),
@@ -77,8 +89,17 @@ fn conversion(epub: &[u8], hyphens: Option<String>) -> Result<Conversion, JsErro
             )));
         }
     };
-    let options = kepubverto::Options { hyphens };
-    let c = kepubverto::convert_with(epub, &options).map_err(|e| JsError::new(&e.to_string()))?;
+    let css = css.unwrap_or_default();
+    let several = css.len() > 1;
+    let options = kepubverto::Options { hyphens, css };
+    let c = kepubverto::convert_with(epub, &options).map_err(|e| match e {
+        // The page names the field, not the CLI flag.
+        kepubverto::Error::Css(e) if several => {
+            JsError::new(&format!("extra CSS, value {}: {}", e.value, e.reason))
+        }
+        kepubverto::Error::Css(e) => JsError::new(&format!("extra CSS: {}", e.reason)),
+        e => JsError::new(&e.to_string()),
+    })?;
     let complete = c.complete();
     let documents = c
         .documents
