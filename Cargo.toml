@@ -1,6 +1,6 @@
 [package]
 name = "kepubverto"
-version = "0.2.3"
+version = "0.3.0"
 edition = "2024"
 rust-version = "1.88"
 description = "Converts EPUB to KEPUB for Kobo e-readers, in pure Rust, without making the book worse."

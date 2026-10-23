@@ -408,7 +408,7 @@ around in one. The rule in
 [Where a span would be invalid](#where-a-span-would-be-invalid) came from
 the first such run.
 
-The last run (2026-10-15, for 0.2.0), all 562 shelf books, kepubify 4.0.4
+The 0.2.0 run (2026-10-15), all 562 shelf books, kepubify 4.0.4
 as the oracle, three times: with no option, `--hyphens auto` and
 `--hyphens none`:
 
@@ -445,7 +445,7 @@ book, the report, stderr and the exit code are byte for byte 0.2.2's. The
 shelf A/B graded by epubveri 0.31.0 (no option): findings added 0 at every
 severity, spans identical to kepubify's in the same 543.
 
-The `--css` run (2026-10-23, unreleased), all 562 books, epubveri 0.33.0
+The `--css` run (2026-10-23, for 0.3.0), all 562 books, epubveri 0.33.0
 (styloria 0.16.1), every severity, usage included: findings added 0 with no
 option and 0 with `--hyphens auto` plus two `--css` values (one with `<` and
 `&` in a string, one with `!important`); spans identical to kepubify's in the
