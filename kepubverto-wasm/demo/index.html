@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- family-web template v6 (family-web v0.6.0) -->
+<!-- family-web template v7 (family-web v0.7.1) -->
 <html lang="en">
   <head>
     <meta charset="utf-8" />
@@ -20,17 +20,6 @@
     <style>
       .actionbar { display: flex; gap: .75rem; align-items: center; flex-wrap: wrap; margin: 1rem 0; }
       td.path { word-break: break-all; }
-      #status { white-space: pre-line; } /* a refused CSS lists its findings, one per line */
-      /* Extra CSS: the textarea takes button/select's shape from demo.css. */
-      .cssopt { margin: 0 0 1rem; }
-      .cssopt label { display: block; font-size: .85rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-bottom: .35rem; }
-      .cssopt textarea {
-        display: block; box-sizing: border-box; width: 100%; min-height: 4.5rem; resize: vertical;
-        font: .85rem/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-        border: 1px solid var(--border); background: var(--card); color: var(--fg);
-        border-radius: 8px; padding: .45rem .6rem;
-      }
-      .cssopt p { margin: .35rem 0 0; font-size: .8rem; color: var(--muted); }
     </style>
   </head>
   <body>
@@ -76,9 +65,9 @@
         </select>
       </div>
 
-      <div class="cssopt">
+      <div class="field">
         <label for="css">Extra CSS</label>
-        <textarea id="css" spellcheck="false" placeholder="p { text-indent: 1.5em; margin: 0 }"></textarea>
+        <textarea id="css" class="mono" spellcheck="false" placeholder="p { text-indent: 1.5em; margin: 0 }"></textarea>
         <p>Added to every converted document, after kepubverto's own rules. Refused if it refers to a file, has <code>@font-face</code>, or would add a finding epubveri reports.</p>
       </div>
 
