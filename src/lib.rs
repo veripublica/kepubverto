@@ -25,6 +25,7 @@ pub mod container;
 pub mod content;
 mod css;
 mod segment;
+mod zipwrite;
 
 use std::collections::BTreeMap;
 

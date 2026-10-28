@@ -642,12 +642,12 @@ fn a_wrong_crc_or_an_understated_size_still_converts() {
     }
 }
 
-/// An untouched entry is copied with no extra field in either header, as
-/// under zip 8. zip 9's `raw_copy_file` refuses an Info-ZIP Unix field
-/// (0x7875) without its "unreserved" feature, which stopped a shelf book
-/// from being written.
+/// An untouched entry is copied verbatim, its extra fields with it. Before
+/// 0.3.1, zip's writer dropped them from both headers; zip 9's `raw_copy_file`
+/// refuses an Info-ZIP Unix field (0x7875) outright, which once stopped a
+/// shelf book from being written.
 #[test]
-fn an_untouched_entry_with_a_unix_extra_field_is_copied_without_it() {
+fn an_untouched_entry_with_a_unix_extra_field_is_copied_with_it() {
     let doc = page(EPUB3_HEAD, "<p>x</p>");
     let mut input = book(true, &[&doc]);
     // Rebuild with a 0x5455 field on the stylesheet, then re-tag it 0x7875.
@@ -693,6 +693,108 @@ fn an_untouched_entry_with_a_unix_extra_field_is_copied_without_it() {
     );
     assert_eq!(extra_lengths(&input), [9, 9]);
     let c = convert(&input).unwrap();
-    assert_eq!(extra_lengths(&c.epub), [0, 0]);
+    assert_eq!(extra_lengths(&c.epub), [9, 9]);
+    assert_eq!(
+        local_part(&c.epub, "OEBPS/style.css"),
+        local_part(&input, "OEBPS/style.css")
+    );
     assert_eq!(entry(&c.epub, "OEBPS/style.css"), "p { margin: 0 }");
+}
+
+/// `name`'s local header and data, as they lie in `epub`.
+fn local_part(epub: &[u8], name: &str) -> Vec<u8> {
+    let mut z = ZipArchive::new(Cursor::new(epub)).unwrap();
+    let f = z.by_name(name).unwrap();
+    let (start, end) = (
+        f.header_start(),
+        f.data_start().unwrap() + f.compressed_size(),
+    );
+    epub[start as usize..end as usize].to_vec()
+}
+
+/// A book the conversion changes nothing in (its one document is not
+/// well-formed) comes back byte-identical, written as `zip` writes or as a
+/// stream, with a data descriptor after every entry (src/zipwrite.rs).
+#[test]
+fn a_book_nothing_changed_in_is_written_byte_identically() {
+    let plain = book(true, &[&page(EPUB3_HEAD, "<p>open")]);
+    let mut streamed = Vec::new();
+    {
+        let mut src = ZipArchive::new(Cursor::new(plain.as_slice())).unwrap();
+        let mut z = ZipWriter::new_stream(&mut streamed);
+        for i in 0..src.len() {
+            let mut f = src.by_index(i).unwrap();
+            let opts = SimpleFileOptions::default().compression_method(f.compression());
+            let mut data = Vec::new();
+            f.read_to_end(&mut data).unwrap();
+            z.start_file(f.name().unwrap().into_owned(), opts).unwrap();
+            z.write_all(&data).unwrap();
+        }
+        z.set_comment("an archive comment").unwrap();
+        z.finish().unwrap();
+    }
+    assert!(streamed.windows(4).any(|w| w == b"PK\x07\x08"));
+    for input in [plain, streamed] {
+        let c = convert(&input).unwrap();
+        assert!(!c.complete());
+        assert_eq!(c.epub, input);
+    }
+}
+
+/// A converted entry keeps every header field but those its new data decides
+/// (CRC, sizes): time, attributes, extra fields and comment stay, and so does
+/// the archive comment.
+#[test]
+fn a_converted_entry_keeps_its_header_fields() {
+    let doc = page(EPUB3_HEAD, "<p>x</p>");
+    let input = {
+        let src_bytes = book(true, &[&doc]);
+        let mut src = ZipArchive::new(Cursor::new(src_bytes.as_slice())).unwrap();
+        let mut z = ZipWriter::new(Cursor::new(Vec::new()));
+        for i in 0..src.len() {
+            let f = src.by_index_raw(i).unwrap();
+            if f.name().unwrap() != "OEBPS/Text/c0.xhtml" {
+                z.raw_copy_file(f).unwrap();
+                continue;
+            }
+            drop(f);
+            let mut opts = zip::write::FullFileOptions::default()
+                .compression_method(CompressionMethod::Deflated)
+                .unix_permissions(0o600)
+                .with_file_comment("an entry comment");
+            opts.add_extra_field(0x5455, [1u8, 1, 2, 3, 4], false)
+                .unwrap();
+            opts.add_extra_field(0x6666, [9u8, 8, 7], true).unwrap();
+            z.start_file("OEBPS/Text/c0.xhtml", opts).unwrap();
+            z.write_all(doc.as_bytes()).unwrap();
+        }
+        z.set_comment("an archive comment").unwrap();
+        z.finish().unwrap().into_inner()
+    };
+    let c = convert(&input).unwrap();
+    assert_eq!(c.documents[0].outcome, Outcome::Converted { spans: 1 });
+    let kept = |epub: &[u8]| {
+        let name = b"OEBPS/Text/c0.xhtml";
+        let find = |sig: &[u8], name_at: usize| {
+            (0..epub.len() - name_at)
+                .find(|&i| epub[i..].starts_with(sig) && epub[i + name_at..].starts_with(name))
+                .unwrap()
+        };
+        let (l, c) = (find(b"PK\x03\x04", 30), find(b"PK\x01\x02", 46));
+        let u16_at = |at: usize| u16::from_le_bytes([epub[at], epub[at + 1]]) as usize;
+        let (ln, lx) = (u16_at(l + 26), u16_at(l + 28));
+        let (cn, cx, cc) = (u16_at(c + 28), u16_at(c + 30), u16_at(c + 32));
+        // Local: version, flags, method, time, date; name and extra.
+        let mut keep = epub[l + 4..l + 14].to_vec();
+        keep.extend_from_slice(&epub[l + 30..l + 30 + ln + lx]);
+        // Central: made by .. date, then attributes, name, extra, comment.
+        keep.extend_from_slice(&epub[c + 4..c + 16]);
+        keep.extend_from_slice(&epub[c + 34..c + 42]);
+        keep.extend_from_slice(&epub[c + 46..c + 46 + cn + cx + cc]);
+        keep
+    };
+    assert_eq!(kept(&c.epub), kept(&input));
+    let z = ZipArchive::new(Cursor::new(c.epub.as_slice())).unwrap();
+    assert_eq!(z.comment(), b"an archive comment");
+    assert!(entry(&c.epub, "OEBPS/Text/c0.xhtml").contains("kobo.1.1"));
 }

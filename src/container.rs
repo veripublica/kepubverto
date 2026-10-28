@@ -2,19 +2,22 @@
 //!
 //! Only the entries the conversion needs are inflated: `container.xml`, the
 //! package document and the content documents. Every other entry, and every
-//! content document left unchanged, is raw-copied: the same compressed bytes,
-//! method, timestamp and position. A rewritten entry keeps its name, place,
-//! compression method, timestamp and permissions.
+//! content document left unchanged, is copied verbatim: its local header, data,
+//! data descriptor and central record, only the local-header offset patched
+//! (`src/zipwrite.rs`). A rewritten entry keeps its place and every header
+//! field (name, method, timestamp, attributes, extra fields, comment) but CRC,
+//! sizes and the data-descriptor flag; a method other than stored becomes
+//! deflated. The archive comment is kept.
 
 use std::collections::BTreeMap;
-use std::io::{Cursor, Read, Write};
+use std::io::{Cursor, Read};
 
 use flate2::read::DeflateDecoder;
 use roxmltree::{Document, ParsingOptions};
-use zip::write::SimpleFileOptions;
-use zip::{CompressionMethod, DateTime, ZipArchive, ZipReadOptions, ZipWriter};
+use zip::{CompressionMethod, ZipArchive, ZipReadOptions};
 
 use crate::Error;
+use crate::zipwrite::{Writer, layout};
 
 /// The most entries a container may hold. The largest count on the 544-book
 /// test shelf is 583.
@@ -29,6 +32,7 @@ pub const MAX_ENTRY_BYTES: u64 = 64 * 1024 * 1024;
 pub const MAX_INFLATED_BYTES: u64 = 256 * 1024 * 1024;
 
 pub struct Container<'a> {
+    src: &'a [u8],
     zip: ZipArchive<Cursor<&'a [u8]>>,
     inflated: u64,
 }
@@ -43,7 +47,11 @@ impl<'a> Container<'a> {
                 zip.len()
             )));
         }
-        Ok(Container { zip, inflated: 0 })
+        Ok(Container {
+            src: bytes,
+            zip,
+            inflated: 0,
+        })
     }
 
     pub fn has(&self, name: &str) -> bool {
@@ -113,44 +121,15 @@ impl<'a> Container<'a> {
     }
 
     /// Write the container again, with `changed` entries replaced.
-    pub fn write(mut self, changed: &BTreeMap<String, Vec<u8>>) -> Result<Vec<u8>, Error> {
-        let io = |e: zip::result::ZipError| Error::Write(e.to_string());
-        let mut out = ZipWriter::new(Cursor::new(Vec::new()));
-        for i in 0..self.zip.len() {
-            let f = self.zip.by_index_raw(i).map_err(io)?;
-            let name = f.name().map_err(io)?.into_owned();
-            let Some(data) = changed.get(&name) else {
-                // Not `raw_copy_file`: since zip 9 it writes the central
-                // directory's extra fields into the local header too, which
-                // can give `mimetype` a local extra field it never had
-                // (PKG-005), and refuses an Info-ZIP Unix field (0x7875)
-                // outright. `_touch` with the entry's own time copies what
-                // zip 8's `raw_copy_file` did: no extra field, either header.
-                // epubsana does the same.
-                let time = f
-                    .last_modified()
-                    .filter(DateTime::is_valid)
-                    .unwrap_or_else(DateTime::default_for_write);
-                out.raw_copy_file_touch(f, time, None).map_err(io)?;
-                continue;
-            };
-            let method = match f.compression() {
-                CompressionMethod::Stored => CompressionMethod::Stored,
-                _ => CompressionMethod::Deflated,
-            };
-            let mut opts = SimpleFileOptions::default().compression_method(method);
-            if let Some(t) = f.last_modified() {
-                opts = opts.last_modified_time(t);
+    pub fn write(self, changed: &BTreeMap<String, Vec<u8>>) -> Result<Vec<u8>, Error> {
+        let mut out = Writer::new(self.src);
+        for raw in layout(self.src)? {
+            match changed.get(&raw.name) {
+                Some(data) => out.rewrite(&raw, data)?,
+                None => out.copy(&raw),
             }
-            if let Some(mode) = f.unix_mode() {
-                opts = opts.unix_permissions(mode);
-            }
-            drop(f);
-            out.start_file(name, opts).map_err(io)?;
-            out.write_all(data)
-                .map_err(|e| Error::Write(e.to_string()))?;
         }
-        Ok(out.finish().map_err(io)?.into_inner())
+        out.finish(self.zip.comment())
     }
 }
 

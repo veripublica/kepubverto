@@ -8,6 +8,26 @@ kepubverto is pre-1.0, so breaking changes land as minor-version bumps
 (`0.x.0`), per [Cargo's SemVer compatibility
 rules](https://doc.rust-lang.org/cargo/reference/semver.html).
 
+## [Unreleased]
+
+### Changed
+
+- The container is written by kepubverto itself (`src/zipwrite.rs`, taken
+  from epubsana 0.36.0), not by `zip`. An entry the conversion did not change
+  is copied verbatim: local header, data, data descriptor and central record,
+  only the local-header offset moved. Before, its extra fields were dropped
+  from both headers. A converted document keeps every header field of the
+  original (time, attributes, extra fields, entry comment) but CRC, sizes and
+  the data-descriptor flag. The archive comment is kept. On the 562-book
+  shelf, every entry's contents are byte for byte 0.3.0's, and every entry
+  left unchanged is byte for byte the input's.
+
+### Security
+
+- zip 9.1.3 (was 9.0.4), the floor raised with it: GHSA-m665-v7pm-7grj,
+  GHSA-gmfj-vffv-32pw and GHSA-wjr6-mhvj-cjvm no longer apply. zip now only
+  reads the container.
+
 ## [0.3.0] - 2026-10-23
 
 ### Added

@@ -61,7 +61,8 @@ A content document is every manifest item whose media type is
 with such an item is already invalid; kepubify converts these items like any
 other *(oracle)*, and kepubverto does too, so that their ids match. One that
 does not parse as XML is left untouched, like any other. All other entries
-(the OPF, CSS, images, fonts, …) are copied byte for byte.
+(the OPF, CSS, images, fonts, …) are copied byte for byte, headers
+included: only where each one starts in the archive changes.
 
 An EPUB 2 document whose DOCTYPE references the XHTML DTD may use that DTD's
 named entities (`&nbsp;`, `&rsquo;`, …). An XML parser does not load the DTD,
@@ -451,6 +452,15 @@ option and 0 with `--hyphens auto` plus two `--css` values (one with `<` and
 `&` in a string, one with `!important`); spans identical to kepubify's in the
 same 543 in both. With no option, the converted book, stderr and the exit
 code are byte for byte 0.2.3's in every book.
+
+The container-writer move (2026-10-28, for 0.3.1: our own writer, zip
+9.1.3), all 562 books with no option: findings added 0 (epubveri 0.33.0,
+every severity, usage included), spans identical to kepubify's in the same
+543. Against 0.3.0, every book has the same entries in the same order with
+the same contents, and the archive comment of its input; every entry the
+conversion left unchanged is byte for byte the input's, headers included.
+What differs from 0.3.0 is header metadata: the extra fields 0.3.0 dropped,
+and a converted document's header fields, now the original's.
 
 ## What kepubverto does not do (in this version)
 
