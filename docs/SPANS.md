@@ -462,6 +462,13 @@ conversion left unchanged is byte for byte the input's, headers included.
 What differs from 0.3.0 is header metadata: the extra fields 0.3.0 dropped,
 and a converted document's header fields, now the original's.
 
+The epubveri 0.35.0 move (2026-10-28, with styloria 0.17.0, for 0.3.1), all
+562 books: the converted book, stderr and the exit code are byte for byte
+those of the container-writer build, with no option and with `--hyphens
+auto` plus two `--css` values. The shelf A/B graded by epubveri 0.35.0 (no
+option): findings added 0 at every severity, spans identical to kepubify's
+in the same 543.
+
 ## What kepubverto does not do (in this version)
 
 kepubify also changes things this version leaves alone:

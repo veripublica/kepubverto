@@ -26,15 +26,17 @@ members = ["kepubverto-wasm"]
 # kept"). A fourth, since 0.33.0: `check_style_text` and `style_text_urls`
 # grade the `--css` argument (not the book) by the rules epubveri applies to
 # a `<style>` (docs/SPANS.md, "Extra CSS").
-epubveri = "0.33.0"
+epubveri = "0.35.0"
 # Writes `--css` back as text an XHTML `<style>` can hold as it stands
 # (`serialize_stylesheet_for_xml`, new in 0.16). One styloria in the lock: the
 # requirement follows epubveri's own, as epubsana's does.
-styloria = "0.16.1"
+styloria = "0.17.0"
 # Pure Rust: the "deflate" feature uses zlib-rs; bzip2/zstd (C) stay disabled.
-# The family shares one zip major. Below 9.1.0, GHSA-m665-v7pm-7grj,
-# GHSA-gmfj-vffv-32pw and GHSA-wjr6-mhvj-cjvm apply; 9.1.3 is the newest.
-# zip only reads here: the container is written by `src/zipwrite.rs`.
+# The family shares one zip major. 9.1.3 for GHSA-m665-v7pm-7grj,
+# GHSA-gmfj-vffv-32pw and GHSA-wjr6-mhvj-cjvm (family dependency report,
+# 2026-10-28); epubveri 0.35.0 measured that the last one's fallback to an
+# earlier end record is still so in 9.1.3. zip only reads here: the
+# container is written by `src/zipwrite.rs`.
 zip = { version = "9.1.3", default-features = false, features = ["deflate"] }
 # Inflates stored and deflated entries in `Container::read`, as epubveri and
 # epubsana do: zip 9 refuses an entry longer than its header declares, and one

@@ -276,6 +276,20 @@ fn a_refused_css_value_converts_nothing() {
     }
 }
 
+/// A selector that fails only on a code point the CSS Syntax draft may take
+/// out of names (w3c/csswg-drafts#7129, under review) is accepted, as
+/// epubcheck accepts it; one invalid in both readings is still refused.
+#[test]
+fn a_selector_invalid_only_in_the_narrowed_reading_is_accepted() {
+    let epub = book(true, &[&page(EPUB3_HEAD, "<p>x</p>")]);
+    let c = convert_with(&epub, &with_css(&[".\u{2023} { margin: 0 }"])).unwrap();
+    assert!(entry(&c.epub, "OEBPS/Text/c0.xhtml").contains(".\u{2023}"));
+    assert!(matches!(
+        convert_with(&epub, &with_css(&[".1a { margin: 0 }"])),
+        Err(kepubverto::Error::Css(_))
+    ));
+}
+
 #[test]
 fn css_is_checked_by_the_books_version() {
     // EPUB 3 flags `direction` (CSS-001); EPUB 2 does not.

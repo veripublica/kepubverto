@@ -22,11 +22,19 @@ rules](https://doc.rust-lang.org/cargo/reference/semver.html).
   shelf, every entry's contents are byte for byte 0.3.0's, and every entry
   left unchanged is byte for byte the input's.
 
+- epubveri 0.35.0 (was 0.33.0) and styloria 0.17.0 (was 0.16.1). For
+  `--css`, a selector that fails only on a code point the CSS Syntax draft
+  may take out of names (`.‣ {}`, w3c/csswg-drafts#7129, under review) no
+  longer draws epubveri's CSS-008, so such a value is accepted; epubcheck
+  accepts it too. A value invalid in both readings is still refused.
+
 ### Security
 
-- zip 9.1.3 (was 9.0.4), the floor raised with it: GHSA-m665-v7pm-7grj,
-  GHSA-gmfj-vffv-32pw and GHSA-wjr6-mhvj-cjvm no longer apply. zip now only
-  reads the container.
+- zip 9.1.3 (was 9.0.4), the floor raised with it, for GHSA-m665-v7pm-7grj,
+  GHSA-gmfj-vffv-32pw and GHSA-wjr6-mhvj-cjvm. zip now only reads the
+  container. epubveri 0.35.0 found that the last one's fallback to an
+  earlier end record is still so in 9.1.3; kepubverto does not validate,
+  and such a book is epubveri's to refuse before conversion.
 
 ## [0.3.0] - 2026-10-23
 
