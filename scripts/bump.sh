@@ -6,7 +6,7 @@
 #
 # Usage: scripts/bump.sh 0.25.0 [YYYY-MM-DD]   (date defaults to today)
 #
-# Writes only those three files and the lockfile; commits nothing. The README
+# Writes only those three files and the lockfile; commits nothing. The AGENTS.md
 # and docs/SPANS.md sweep for stale numbers stays a reading job.
 
 set -euo pipefail
