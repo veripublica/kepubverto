@@ -33,8 +33,8 @@ jobs:
       # unpinned installer script). Bump both together.
       - name: Install wasm-pack
         env:
-          WASM_PACK: v0.15.0
-          WASM_PACK_SHA256: c09f971ecaed9a2efc80fdcea7a00ef6b53c7fadc8c57d1f61b53a6aa66b668a
+          WASM_PACK: v0.15.1
+          WASM_PACK_SHA256: 410101009739b9d01c7d5affaaad6e9c9a24b4cba6791a4805db8e89b9bf7af2
         run: |
           set -euo pipefail
           name="wasm-pack-$WASM_PACK-x86_64-unknown-linux-musl"

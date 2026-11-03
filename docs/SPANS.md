@@ -469,6 +469,14 @@ auto` plus two `--css` values. The shelf A/B graded by epubveri 0.35.0 (no
 option): findings added 0 at every severity, spans identical to kepubify's
 in the same 543.
 
+The dependency move (2026-11-04: epubveri 0.37.1, styloria 0.19.0, zip 9.3.0,
+roxmltree 0.21.2), all 562 books: the converted book, stderr and the exit code
+are byte for byte those of the build before it, with no option and with
+`--hyphens auto` plus two `--css` values, so zip 9.3.0's stricter reader refuses
+no shelf book. The shelf A/B graded by epubveri 0.37.1, with no option and with
+those options: findings added 0 at every severity, spans identical to kepubify's
+in the same 543.
+
 ## What kepubverto does not do (in this version)
 
 kepubify also changes things this version leaves alone:

@@ -301,6 +301,41 @@ fn css_is_checked_by_the_books_version() {
     ));
 }
 
+/// epubveri 0.37 grades CSS values under `--advisory`, which is how a `--css`
+/// value is checked (ADV-024).
+#[test]
+fn a_value_its_property_cannot_take_is_refused() {
+    let epub = book(true, &[&page(EPUB3_HEAD, "<p>x</p>")]);
+    for css in ["p { font-style: bold }", "p { width: 150 }"] {
+        assert!(
+            matches!(
+                convert_with(&epub, &with_css(&[css])),
+                Err(kepubverto::Error::Css(_))
+            ),
+            "{css}"
+        );
+    }
+}
+
+/// styloria 0.19 knows these names, so they are no longer refused as unknown.
+#[test]
+fn a_property_the_specifications_define_is_accepted() {
+    let epub = book(true, &[&page(EPUB3_HEAD, "<p>x</p>")]);
+    let c = convert_with(&epub, &with_css(&["p { size: 10px 2em }"])).unwrap();
+    assert!(entry(&c.epub, "OEBPS/Text/c0.xhtml").contains("size"));
+}
+
+/// EPUB 2 cites CSS2: its own names pass there, and not in EPUB 3.
+#[test]
+fn a_css2_name_is_accepted_only_in_epub2() {
+    let options = with_css(&["p { marker-offset: 1px }"]);
+    assert!(convert_with(&book(false, &[&page(EPUB2_HEAD, "<p>x</p>")]), &options).is_ok());
+    assert!(matches!(
+        convert_with(&book(true, &[&page(EPUB3_HEAD, "<p>x</p>")]), &options),
+        Err(kepubverto::Error::Css(_))
+    ));
+}
+
 #[test]
 fn epub2_named_entities_parse_and_are_kept() {
     let doc = page(EPUB2_HEAD, "<p>a&nbsp;b. c&rsquo;s. d</p>");

@@ -8,6 +8,29 @@ kepubverto is pre-1.0, so breaking changes land as minor-version bumps
 (`0.x.0`), per [Cargo's SemVer compatibility
 rules](https://doc.rust-lang.org/cargo/reference/semver.html).
 
+## [Unreleased]
+
+### Security
+
+- zip 9.3.0 (was 9.1.3), for reader fixes merged after 9.1.3 that no advisory
+  listed yet on 2026-11-03. kepubverto opens untrusted files with it. On the
+  562-book shelf, no book that opened before is refused now.
+- roxmltree 0.21.2 (was 0.21.1), which fixes a stack overflow on deeply nested
+  elements. `xmlguard` already stopped such a document before the parse.
+
+### Changed
+
+- epubveri 0.37.1 (was 0.35.0) and styloria 0.19.0 (was 0.17.0). This changes
+  which `--css` values are accepted, and only that:
+  - A value its property cannot take is now refused, such as `p { font-style:
+    bold }` or `p { width: 150 }` (epubveri's ADV-024).
+  - Names the CSS specifications define are no longer refused as unknown, such
+    as `size`.
+  - In an EPUB 2 book, CSS2's own names are accepted, such as `marker-offset`.
+- With no option and with `--hyphens auto` plus two `--css` values, the converted
+  book, stderr and the exit code are byte for byte the previous build's on the
+  562-book shelf. Findings added: 0 at every severity.
+
 ## [0.3.1] - 2026-10-29
 
 ### Changed
