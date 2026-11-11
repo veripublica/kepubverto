@@ -5,7 +5,7 @@ true at every release. What the conversion does, rule by rule, and every
 measurement run are in [`docs/SPANS.md`](docs/SPANS.md). Past changes:
 `CHANGELOG.md`. API docs: <https://docs.rs/kepubverto>.
 
-Figures below name the versions they were measured on. Current version: 0.4.0.
+Figures below name the versions they were measured on. Current version: 0.5.0.
 
 ## Scope
 
@@ -254,15 +254,15 @@ as already converted: converting twice changes nothing.
 ## Measurements
 
 From the test shelf, 562 real books, kepubify 4.0.4 as the oracle. The shelf is
-private and never goes to public CI. Latest run: 2026-11-04, graded by epubveri
-0.37.1, with no option and with `--hyphens auto` plus two `--css` values. Every
+private and never goes to public CI. Latest run: 2026-11-11, graded by epubveri
+0.40.1, with no option and with `--hyphens auto` plus two `--css` values. Every
 earlier run is in `docs/SPANS.md`.
 
 - Findings added by the conversion, every severity: **0**.
-- Books whose spans are identical to kepubify's: **543**. In the other 19, as
-  analysed at 0.2.0: 13 have markup an HTML parser rebuilds (a block inside a
-  `p`, or a self-closed non-void element), 4 have spans left out where they
-  would be invalid, the rest carrying kepubify's ids, and 2 have matching ids
+- Books whose spans are identical to kepubify's: **542**. In the other 20, as
+  analysed at 0.2.0 and 0.5.0: 13 have markup an HTML parser rebuilds (a block
+  inside a `p`, or a self-closed non-void element), 5 have spans left out where
+  they would be invalid, the rest carrying kepubify's ids, and 2 have matching ids
   with text that differs because an HTML parser maps `&#128;`–`&#159;` onto
   Windows-1252.
 

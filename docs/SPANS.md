@@ -503,6 +503,17 @@ no shelf book. The shelf A/B graded by epubveri 0.37.1, with no option and with
 those options: findings added 0 at every severity, spans identical to kepubify's
 in the same 543.
 
+The 0.5.0 run (2026-11-11: the [figure caption](#where-a-span-would-be-invalid)
+rule, epubveri 0.40.1, zip 9.5.1), all 562 books, graded by epubveri 0.40.1,
+with no option and with `--hyphens auto` plus `--css 'p::after { content:
+"<&" }'` and `--css 'p { text-indent: 1.5em !important }'`: findings added 0 at
+every severity in both, and the same exit codes (561 books 0, one 1 for a file
+its manifest names and its container lacks). Spans identical to kepubify's in
+542: the one more that differs is an EPUB 2 book with an `img` and its caption
+alone in a `figure`, whose image now has no span. EPUB 2 has no `figure` and
+requires `alt`, so the image was an error before the conversion and still is.
+No EPUB 3 book on the shelf has the case of #2.
+
 ## What kepubverto does not do (in this version)
 
 kepubify also changes things this version leaves alone:

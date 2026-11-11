@@ -8,7 +8,7 @@ kepubverto is pre-1.0, so breaking changes land as minor-version bumps
 (`0.x.0`), per [Cargo's SemVer compatibility
 rules](https://doc.rust-lang.org/cargo/reference/semver.html).
 
-## [Unreleased]
+## [0.5.0] - 2026-11-11
 
 ### Fixed
 
@@ -18,6 +18,10 @@ rules](https://doc.rust-lang.org/cargo/reference/semver.html).
   RSC-005 error for every such image. The image is counted and its span left
   out, so every other span keeps kepubify's id. epubveri reports this from
   0.39.0 on; EPUBCheck 5.4.0 does not.
+- On the 562-book shelf, graded by epubveri 0.40.1 with no option and with
+  `--hyphens auto` plus two `--css` values: findings added 0 at every
+  severity. The one shelf book with such a figure is EPUB 2, where its image
+  was already an error; the image now has no span there either.
 
 ### Changed
 
