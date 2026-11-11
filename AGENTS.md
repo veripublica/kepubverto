@@ -153,8 +153,8 @@ alone is always at least an error, so the input is `problems` and the exit code
 | is not well-formed XML | `RSC-016` | fatal |
 | has no XHTML `<body>` | `RSC-005` | error |
 | is named in the manifest but missing from the container | `RSC-001` | error |
-| is UTF-16 (`application/xhtml+xml`) | `HTM_058` | error |
-| is UTF-16 (`text/html`, which epubcheck grades only as a warning) | `KEPUB-006` | error |
+| is UTF-16 (`application/xhtml+xml` in EPUB 3) | `HTM_058` | error |
+| is UTF-16 (`text/html` in EPUB 3, which epubcheck grades only as a warning, or any item in EPUB 2, where UTF-16 is allowed) | `KEPUB-006` | error |
 | is in UCS-4, EBCDIC or another declared encoding | `RSC-028` | error |
 | … declared under a name epubcheck's XML parser does not take | `RSC-016` | fatal |
 | is not UTF-8, and declares no other encoding | `KEPUB-001` | error |
@@ -207,11 +207,13 @@ std::fs::write("book.kepub.epub", &conversion.epub)?;
   `Result<Conversion, Error>`.
 - `Options { hyphens: Option<Hyphens>, css: Vec<String> }` mirrors `--hyphens`
   and `--css`.
-- `Conversion` holds `epub` and `documents` (one `Document { path, media_type,
-  outcome }` per content document, in manifest order), plus `left_alone()`,
-  `complete()` and `spans()`.
+- `Conversion` holds `epub`, `documents` (one `Document { path, media_type,
+  outcome }` per content document, in manifest order) and `epub3`, plus
+  `left_alone()`, `complete()` and `spans()`.
 - `Error` is `NotAnEpub`, `TooLarge`, `Unreadable`, `Write` or `Css`. A document
   that cannot be converted is not an error: it is an `Outcome` with a `Reason`.
+  `Reason::code_for(media_type, epub3)` gives the code and severity of the
+  table above. `Reason::code(media_type)` is EPUB 3's grade.
 - `container` and `content` are public modules, and `codes` holds the
   `KEPUB-00N` constants.
 
@@ -281,6 +283,10 @@ as the EPUB specification requires. Measured differences:
   is not allowed. On the shelf, two books gained 3,994 `RSC-005` errors this way.
   EPUBCheck 5.4.0 now accepts a span in `option`; kepubverto still skips one
   there, which leaves ids unchanged.
+- kepubify also wraps an `img` with no `alt` that its `figure`'s caption stands
+  in for. The span ends HTML's exception and the image becomes `RSC-005`
+  (epubveri 0.39.0 on; EPUBCheck 5.4.0 does not report it). kepubverto counts
+  the image and leaves its span out (#2).
 - A book converted twice gets kepubify's style rule twice.
 - kepubify's `<style class=…>` is not allowed on an XHTML 1.1 `<style>`, so
   epubcheck reports it once per EPUB 2 document. In EPUB 3 it carries an obsolete

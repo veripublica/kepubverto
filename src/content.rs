@@ -139,25 +139,33 @@ pub mod codes {
     pub const KEPUB_004: &str = "KEPUB-004";
     /// The entry cannot be read out of the container.
     pub const KEPUB_005: &str = "KEPUB-005";
-    /// UTF-16 in an item that is not `application/xhtml+xml`, where
-    /// epubcheck's own grade (RSC-027) is a warning.
+    /// UTF-16 where no ID grades it at `error`: in an EPUB 3 item that is not
+    /// `application/xhtml+xml`, where epubcheck's grade (RSC-027) is a
+    /// warning, and in any EPUB 2 item, where OCF 2.0.1 § 1.3 allows UTF-16.
     pub const KEPUB_006: &str = "KEPUB-006";
 }
 
 impl Reason {
     /// The code and severity a `--format json` finding carries for a document
-    /// left alone for this reason. `media_type` is the manifest's, which
-    /// decides how epubcheck grades UTF-16. epubcheck's ID is used where it
-    /// grades the state at `error` or above; otherwise a `KEPUB-` code
-    /// ([`codes`]), at `error`, because a part left untouched is at least an
-    /// error (FORMATS §1.3).
+    /// left alone for this reason, graded as in EPUB 3. [`Reason::code_for`]
+    /// takes the book's version.
     pub fn code(&self, media_type: &str) -> (&'static str, Severity) {
+        self.code_for(media_type, true)
+    }
+
+    /// The code and severity a `--format json` finding carries for a document
+    /// left alone for this reason. `media_type` is the manifest's and `epub3`
+    /// the book's version ([`crate::Conversion::epub3`]): both decide how UTF-16
+    /// is graded. epubcheck's ID is used where it grades the state at `error`
+    /// or above; otherwise a `KEPUB-` code ([`codes`]), at `error`, because a
+    /// part left untouched is at least an error (FORMATS §1.3).
+    pub fn code_for(&self, media_type: &str, epub3: bool) -> (&'static str, Severity) {
         let error = |code| (code, Severity::Error);
         match self {
             Reason::NotWellFormed(_) => (ids::RSC_016, Severity::Fatal),
             Reason::NoBody => error(ids::RSC_005),
             Reason::Missing => error(ids::RSC_001),
-            Reason::Utf16 => match Sniffed::Utf16.finding(media_type) {
+            Reason::Utf16 => match Sniffed::Utf16.finding_for(media_type, epub3) {
                 Some(f @ (_, Severity::Fatal | Severity::Error)) => f,
                 _ => error(codes::KEPUB_006),
             },
@@ -166,7 +174,7 @@ impl Reason {
                 ..
             } => (ids::RSC_016, Severity::Fatal),
             Reason::Encoding { name, .. } => {
-                match Sniffed::Declared(name.clone()).finding(media_type) {
+                match Sniffed::Declared(name.clone()).finding_for(media_type, epub3) {
                     Some(f @ (_, Severity::Fatal | Severity::Error)) => f,
                     _ => error(ids::RSC_028),
                 }
@@ -419,7 +427,7 @@ impl Walk<'_> {
         self.p += 1;
         self.s = 1;
         self.pending = false;
-        if n.parent().is_none_or(|p| self.holds_span(p)) {
+        if n.parent().is_none_or(|p| self.holds_span(p)) && !caption_stands_for_alt(n) {
             let r = n.range();
             self.open_span(r.start);
             self.close_span(r.end);
@@ -550,6 +558,38 @@ fn content_range(text: &str, element: Range<usize>) -> Option<Range<usize>> {
     }
     let close = tag.rfind("</")?;
     Some(element.start + end + 1..element.start + close)
+}
+
+/// HTML lets an `img` leave out `alt` when it is all its nearest `figure`
+/// holds besides a caption with content. A span would be a second element
+/// there and end the exception, so the image is counted and not wrapped
+/// (docs/SPANS.md, "An image whose caption stands in for `alt`").
+fn caption_stands_for_alt(img: Node) -> bool {
+    if attr(img, "alt").is_some() {
+        return false;
+    }
+    let Some(figure) = img.ancestors().skip(1).find(|a| is_xhtml(*a, "figure")) else {
+        return false;
+    };
+    let blank = |t: &str| t.chars().all(|c| matches!(c, ' ' | '\t' | '\n' | '\r'));
+    let is_caption = |n: Node| n.parent() == Some(figure) && is_xhtml(n, "figcaption");
+    let captioned = figure.children().filter(|c| is_caption(*c)).any(|c| {
+        c.descendants()
+            .skip(1)
+            .any(|d| d.is_element() || d.text().is_some_and(|t| d.is_text() && !blank(t)))
+    });
+    let alone = figure
+        .descendants()
+        .skip(1)
+        .filter(|d| !d.ancestors().any(is_caption))
+        .all(|d| {
+            if d.is_element() {
+                d == img
+            } else {
+                !d.is_text() || d.text().is_none_or(blank)
+            }
+        });
+    captioned && alone
 }
 
 fn is_xhtml(n: Node, name: &str) -> bool {

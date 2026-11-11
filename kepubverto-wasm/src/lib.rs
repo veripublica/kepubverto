@@ -101,6 +101,7 @@ fn conversion(
         e => JsError::new(&e.to_string()),
     })?;
     let complete = c.complete();
+    let epub3 = c.epub3;
     let documents = c
         .documents
         .into_iter()
@@ -111,7 +112,7 @@ fn conversion(
                 kepubverto::Outcome::NothingToDo => ("nothing_to_do", 0, None),
                 kepubverto::Outcome::LeftAlone(r) => ("left_alone", 0, Some(r)),
             };
-            let code = reason.as_ref().map(|r| r.code(&d.media_type));
+            let code = reason.as_ref().map(|r| r.code_for(&d.media_type, epub3));
             Document {
                 path: d.path,
                 outcome: outcome.to_string(),

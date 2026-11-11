@@ -440,6 +440,50 @@ fn where_a_span_is_invalid_it_is_counted_and_left_out() {
 }
 
 #[test]
+fn an_image_whose_caption_stands_in_for_alt_is_counted_and_left_out() {
+    // Issue #2. kepubify gives the caption kobo.0.1, the image kobo.1.1 and
+    // the paragraph kobo.2.1.
+    let convert3 = |body: &str| {
+        entry(
+            &convert(&book(true, &[&page(EPUB3_HEAD, body)]))
+                .unwrap()
+                .epub,
+            "OEBPS/Text/c0.xhtml",
+        )
+    };
+    for figure in [
+        "<figure>\n<figcaption>Figure 1.1: A caption</figcaption>\n<img src=\"a.png\"/>\n</figure>",
+        "<figure><img src=\"a.png\"/><figcaption><b>Bold</b></figcaption><!-- c --></figure>",
+    ] {
+        let out = convert3(&format!("{figure}<p>after</p>"));
+        assert!(out.contains("<img src=\"a.png\"/>"), "{out}");
+        assert!(!out.contains("kobo.1.1"), "{out}");
+        assert!(out.contains(r#"id="kobo.2.1">after"#), "{out}");
+    }
+    assert!(
+        convert3("<figure><figcaption>c</figcaption><img src=\"a.png\"/></figure>")
+            .contains(r#"<span class="koboSpan" id="kobo.0.1">c</span></figcaption><img"#)
+    );
+
+    // Where the exception does not hold, the image is wrapped as before.
+    for figure in [
+        "<figure><figcaption>c</figcaption><img src=\"a.png\" alt=\"\"/></figure>",
+        "<figure><figcaption> </figcaption><img src=\"a.png\"/></figure>",
+        "<figure><img src=\"a.png\"/></figure>",
+        "<figure><figcaption>c</figcaption><div><img src=\"a.png\"/></div></figure>",
+        "<figure><figcaption>c</figcaption><img src=\"a.png\"/>&#160;</figure>",
+        "<figure><figcaption>c</figcaption><img src=\"a.png\"/><img src=\"b.png\"/></figure>",
+        "<div><figcaption>c</figcaption><img src=\"a.png\"/></div>",
+    ] {
+        let out = convert3(figure);
+        assert!(
+            out.contains(r#"<span class="koboSpan" id="kobo.1.1"><img src="a.png""#),
+            "{figure}: {out}"
+        );
+    }
+}
+
+#[test]
 fn comments_cdata_and_instructions_split_text_and_are_never_wrapped() {
     let doc = page(
         EPUB3_HEAD,
@@ -560,7 +604,7 @@ fn left_alone(doc: &[u8], text_html: bool) -> (Reason, &'static str, &'static st
     let Outcome::LeftAlone(reason) = &d.outcome else {
         panic!("converted: {:?}", d.outcome);
     };
-    let (code, severity) = reason.code(&d.media_type);
+    let (code, severity) = reason.code_for(&d.media_type, c.epub3);
     (reason.clone(), code, severity.as_str())
 }
 
@@ -581,6 +625,23 @@ fn utf16_is_htm_058_in_xhtml_and_ours_in_text_html() {
         let (r, code, sev) = left_alone(&utf16le(&doc, bom), true);
         assert_eq!((r, code, sev), (Reason::Utf16, "KEPUB-006", "error"));
     }
+}
+
+#[test]
+fn utf16_in_epub2_is_ours_since_epub2_allows_it() {
+    // OCF 2.0.1 § 1.3: UTF-16 is allowed, so no ID grades it at all.
+    let doc = page(EPUB2_HEAD, "<p>x</p>").replace("utf-8", "UTF-16");
+    let c = convert(&book_bytes(false, &[&utf16le(&doc, true)])).unwrap();
+    assert!(!c.epub3);
+    let d = &c.documents[0];
+    let Outcome::LeftAlone(reason) = &d.outcome else {
+        panic!("converted: {:?}", d.outcome);
+    };
+    assert_eq!(*reason, Reason::Utf16);
+    let (code, sev) = reason.code_for(&d.media_type, c.epub3);
+    assert_eq!((code, sev.as_str()), ("KEPUB-006", "error"));
+    // `code` keeps EPUB 3's grade.
+    assert_eq!(reason.code(&d.media_type).0, "HTM_058");
 }
 
 #[test]
@@ -846,4 +907,26 @@ fn a_converted_entry_keeps_its_header_fields() {
     let z = ZipArchive::new(Cursor::new(c.epub.as_slice())).unwrap();
     assert_eq!(z.comment(), b"an archive comment");
     assert!(entry(&c.epub, "OEBPS/Text/c0.xhtml").contains("kobo.1.1"));
+}
+
+/// The deepest document `epubveri::xmlguard` admits converts on a `cargo test`
+/// thread (2 MiB) in a debug build, and one level more is left alone. roxmltree
+/// and the walk both recurse once per level.
+#[test]
+fn the_deepest_admitted_document_converts_and_one_more_is_left_alone() {
+    let nested = |divs: usize| {
+        let body = format!("{}<p>x</p>{}", "<div>".repeat(divs), "</div>".repeat(divs));
+        convert(&book(true, &[&page(EPUB3_HEAD, &body)]))
+            .unwrap()
+            .documents[0]
+            .outcome
+            .clone()
+    };
+    // html, body and p are three of the 256 levels.
+    let limit = epubveri::xmlguard::MAX_XML_DEPTH - 3;
+    assert_eq!(nested(limit), Outcome::Converted { spans: 1 });
+    assert!(matches!(
+        nested(limit + 1),
+        Outcome::LeftAlone(Reason::TooLarge(_))
+    ));
 }

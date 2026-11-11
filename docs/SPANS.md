@@ -155,6 +155,32 @@ Whitespace-only text in these places is not wrapped anyway (see below), so
 the rule only reaches text or images that already make the document invalid.
 The book stays as invalid as it was, and gets no worse.
 
+**An image whose caption stands in for `alt`.** HTML lets an `img` leave out
+`alt` when the image is all its `figure` holds besides a caption (HTML
+§ 4.8.4.4.15). A span would be a second element in the figure, so the image
+would lose the exception and become an error (RSC-005). Such an `img` is
+counted and not wrapped, as above. It is one where all of these hold in the
+input:
+
+- the `img` has no `alt` attribute;
+- its nearest `figure` ancestor has a `figcaption` child holding an element
+  or non-whitespace text;
+- outside its `figcaption` children, that `figure` holds no element but the
+  `img` and no text but whitespace (space, tab, line feed, carriage return).
+
+The rule is the same in both versions. EPUB 2 has no `figure` and requires
+`alt`, so there it only reaches an image that is already an error. An `img`
+with an `alt` is wrapped as before, in a `figure` or not. kepubify wraps the
+image *(oracle, 2026-11-11: `kobo.1.1` in the smallest case)*, so here too
+the id is left out and the others keep kepubify's numbers.
+
+This was reported in
+[#2](https://github.com/veripublica/kepubverto/issues/2): one book in a
+reader's 549 gained 36 RSC-005 errors in 0.4.0. epubveri reports a missing
+`alt` from 0.39.0 on. epubveri 0.37.1, which graded the shelf runs below,
+and epubcheck 5.4.0 report neither the input nor the output, so those runs
+could not see it.
+
 ### Text
 
 Each text node in the walk is split into **segments** (see

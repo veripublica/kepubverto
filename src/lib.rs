@@ -71,6 +71,8 @@ pub struct Conversion {
     /// One entry per content document in the manifest (`application/xhtml+xml`
     /// or `text/html`), in manifest order.
     pub documents: Vec<Document>,
+    /// The book is EPUB 3; otherwise EPUB 2. [`Reason::code_for`] takes it.
+    pub epub3: bool,
 }
 
 /// One content document and its outcome.
@@ -79,7 +81,7 @@ pub struct Document {
     /// The path inside the container.
     pub path: String,
     /// The manifest's media type, lowercased: `application/xhtml+xml` or
-    /// `text/html`. [`Reason::code`] takes it.
+    /// `text/html`. [`Reason::code_for`] takes it.
     pub media_type: String,
     pub outcome: Outcome,
 }
@@ -180,5 +182,9 @@ pub fn convert_with(epub: &[u8], options: &Options) -> Result<Conversion, Error>
         });
     }
     let epub = c.write(&changed)?;
-    Ok(Conversion { epub, documents })
+    Ok(Conversion {
+        epub,
+        documents,
+        epub3: package.epub3,
+    })
 }

@@ -398,7 +398,7 @@ type Data = ();
 
 /// The input object for a converted book: one `finding` per content document
 /// left as it was (FORMATS §1.3, "A part a transformer leaves untouched"),
-/// at the code and severity [`kepubverto::Reason::code`] gives.
+/// at the code and severity [`kepubverto::Reason::code_for`] gives.
 fn input_converted(c: &Conversion, input: &str, out: &Path) -> Input<Summary, Data> {
     let count = |f: fn(&Outcome) -> bool| c.documents.iter().filter(|d| f(&d.outcome)).count();
     let summary = Summary {
@@ -414,7 +414,7 @@ fn input_converted(c: &Conversion, input: &str, out: &Path) -> Input<Summary, Da
         .iter()
         .filter_map(|d| match &d.outcome {
             Outcome::LeftAlone(reason) => {
-                let (code, severity) = reason.code(&d.media_type);
+                let (code, severity) = reason.code_for(&d.media_type, c.epub3);
                 Some(Item::finding(
                     code.to_string(),
                     None,

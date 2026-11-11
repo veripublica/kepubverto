@@ -29,6 +29,17 @@ const BODIES: &[&str] = &[
     "<p><a href=\"c0.xhtml\">link. text</a> more. <span>inner</span></p>",
 ];
 
+/// Shapes only EPUB 3 has. An `img` whose caption stands in for `alt` (issue
+/// #2): epubveri reports a missing `alt` from 0.39.0 on.
+const EPUB3_BODIES: &[&str] = &[
+    "<figure>\n<figcaption>Figure 1. A caption.</figcaption>\n<img src=\"../Images/i.png\"/>\n</figure><p>After it.</p>",
+];
+
+fn bodies(epub3: bool) -> Vec<&'static str> {
+    let extra = if epub3 { EPUB3_BODIES } else { &[] };
+    BODIES.iter().chain(extra).copied().collect()
+}
+
 fn epub3_page(body: &str) -> String {
     format!(
         "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<!DOCTYPE html>\n<html xmlns=\"http://www.w3.org/1999/xhtml\" xmlns:epub=\"http://www.idpf.org/2007/ops\" xml:lang=\"en\" lang=\"en\">\n<head>\n<title>T</title>\n</head>\n<body>\n{body}\n</body>\n</html>\n"
@@ -44,7 +55,7 @@ fn epub2_page(body: &str) -> String {
 fn book(epub3: bool) -> Vec<u8> {
     let mut items = String::new();
     let mut spine = String::new();
-    for i in 0..BODIES.len() {
+    for i in 0..bodies(epub3).len() {
         items.push_str(&format!(
             r#"<item id="c{i}" href="Text/c{i}.xhtml" media-type="application/xhtml+xml"/>"#
         ));
@@ -73,7 +84,7 @@ fn book(epub3: bool) -> Vec<u8> {
     z.write_all(opf.as_bytes()).unwrap();
     z.start_file("OEBPS/Images/i.png", stored).unwrap();
     z.write_all(PNG).unwrap();
-    for (i, body) in BODIES.iter().enumerate() {
+    for (i, body) in bodies(epub3).iter().enumerate() {
         let page = if epub3 {
             epub3_page(body)
         } else {

@@ -8,6 +8,35 @@ kepubverto is pre-1.0, so breaking changes land as minor-version bumps
 (`0.x.0`), per [Cargo's SemVer compatibility
 rules](https://doc.rust-lang.org/cargo/reference/semver.html).
 
+## [Unreleased]
+
+### Fixed
+
+- An `img` with no `alt` that is alone in a `figure` with a caption is no
+  longer wrapped in a span (#2). HTML lets such an image leave out `alt`,
+  and the span ended that exception, so a valid EPUB 3 book gained an
+  RSC-005 error for every such image. The image is counted and its span left
+  out, so every other span keeps kepubify's id. epubveri reports this from
+  0.39.0 on; EPUBCheck 5.4.0 does not.
+
+### Changed
+
+- **Breaking:** `Conversion` has a new public field, `epub3`. Code that
+  builds a `Conversion` itself must set it.
+- New `Reason::code_for(media_type, epub3)`. A UTF-16 document in an EPUB 2
+  book now gets `KEPUB-006` (error) in the `--format json` report and on
+  the web page, not `HTM_058`: OCF 2.0.1 § 1.3 allows UTF-16 there.
+  `Reason::code` is unchanged and gives EPUB 3's grade.
+- epubveri 0.40.1 (was 0.37.1). Its CSS changes since 0.37.1 do not change
+  which `--css` values are accepted: `@charset` labels are read only from a
+  file's bytes, and a `url()` nested in another function was already
+  refused, like every `url()`.
+
+### Security
+
+- zip 9.5.1 (was 9.3.0), with the family (R19). Its changes are in writing
+  and extraction, which kepubverto does not use.
+
 ## [0.4.0] - 2026-11-04
 
 ### Security
