@@ -8,6 +8,21 @@ kepubverto is pre-1.0, so breaking changes land as minor-version bumps
 (`0.x.0`), per [Cargo's SemVer compatibility
 rules](https://doc.rust-lang.org/cargo/reference/semver.html).
 
+## [Unreleased]
+
+### Changed
+
+- epubveri 0.43.0 (was 0.40.1) and styloria 0.20.0 (was 0.19.0). Converted
+  books are byte for byte the same as 0.5.0's on the 562-book shelf, with no
+  option and with `--hyphens auto` plus two `--css` values, and graded by
+  epubveri 0.43.0 they gain no findings at any severity.
+- `--css` in an EPUB 3 book follows epubveri 0.41's CSS rules: a nested
+  style rule (`p { span { color: red } }`) is now accepted, and a selector
+  with an undeclared namespace prefix (`svg|rect`) or a comment that runs to
+  the end of the value is now refused. In EPUB 3 and EPUB 2, a custom
+  property value that cannot fit `<declaration-value>` (`--x: a)`) and a
+  pseudo-element after `::before` (`p::before::before`) are now refused.
+
 ## [0.5.0] - 2026-11-11
 
 ### Fixed

@@ -386,7 +386,10 @@ A value is refused, and nothing is converted (exit 2), when:
   (CSS-008), `position: fixed` (CSS-006), a property EPUB 3 flags (CSS-001), a
   property nobody defines or a value that cannot fit its grammar (ADV-*).
   Every finding is shown, located at `--css` with its line and column. The
-  serialized text is checked the same way before it is written.
+  serialized text is checked the same way before it is written. So the
+  accepted CSS is epubveri's: in EPUB 3 a nested style rule (CSS Nesting) is
+  accepted, as epubveri 0.41 grades it, even though an older reading system
+  drops it; in EPUB 2 it is CSS-008 and refused.
 - **It is empty**, or holds only whitespace and comments.
 
 This checks the argument, not the book: kepubverto still does not validate

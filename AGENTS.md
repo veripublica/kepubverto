@@ -113,6 +113,10 @@ written safely in XML, refers to a file, has `@font-face`, or draws any finding
 from epubveri's `check_style_text` at the book's version. That checks the
 argument, not the book. Since epubveri 0.37 that check includes CSS values
 (ADV-024), so `p { font-style: bold }` and `p { width: 150 }` are refused.
+Since epubveri 0.41, EPUB 3 accepts a nested rule (CSS Nesting, `p { span { … } }`)
+and refuses a selector with an undeclared namespace prefix (`svg|rect`) or a
+comment left open; EPUB 2 still refuses nesting. A reader that does not know
+CSS Nesting drops the nested rule, so it adds nothing there.
 
 ```sh
 kepubverto -i book.epub                 # writes book.kepub.epub
