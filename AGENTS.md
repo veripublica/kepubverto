@@ -5,7 +5,7 @@ true at every release. What the conversion does, rule by rule, and every
 measurement run are in [`docs/SPANS.md`](docs/SPANS.md). Past changes:
 `CHANGELOG.md`. API docs: <https://docs.rs/kepubverto>.
 
-Figures below name the versions they were measured on. Current version: 0.5.0.
+Figures below name the versions they were measured on. Current version: 0.5.1.
 
 ## Scope
 
@@ -258,8 +258,8 @@ as already converted: converting twice changes nothing.
 ## Measurements
 
 From the test shelf, 562 real books, kepubify 4.0.4 as the oracle. The shelf is
-private and never goes to public CI. Latest run: 2026-11-11, graded by epubveri
-0.40.1, with no option and with `--hyphens auto` plus two `--css` values. Every
+private and never goes to public CI. Latest run: 2026-11-14, graded by epubveri
+0.43.0, with no option and with `--hyphens auto` plus two `--css` values. Every
 earlier run is in `docs/SPANS.md`.
 
 - Findings added by the conversion, every severity: **0**.

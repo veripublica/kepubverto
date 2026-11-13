@@ -517,6 +517,13 @@ alone in a `figure`, whose image now has no span. EPUB 2 has no `figure` and
 requires `alt`, so the image was an error before the conversion and still is.
 No EPUB 3 book on the shelf has the case of #2.
 
+The dependency move (2026-11-14: epubveri 0.43.0, styloria 0.20.0), all 562
+books: the converted book, stderr and the exit code are byte for byte those of
+0.5.0, with no option and with the same options. The shelf A/B graded by
+epubveri 0.43.0, with no option and with those options: findings added 0 at
+every severity, the same exit codes, spans identical to kepubify's in the same
+542.
+
 ## What kepubverto does not do (in this version)
 
 kepubify also changes things this version leaves alone:
