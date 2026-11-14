@@ -8,6 +8,30 @@ kepubverto is pre-1.0, so breaking changes land as minor-version bumps
 (`0.x.0`), per [Cargo's SemVer compatibility
 rules](https://doc.rust-lang.org/cargo/reference/semver.html).
 
+## [Unreleased]
+
+### Fixed
+
+- A converted book whose table of contents spells a file name differently
+  from its manifest, such as `Agatha%27nin.html` against `Agatha'nin.html`,
+  no longer opens halfway through on a Kobo with its page count doubled.
+  Kobo's renderer matches the two by the name as written, so it counted
+  the book twice (kepubify#107). Seen on a Kobo with firmware 4.38.23852:
+  a book converted by 0.5.1 opened on page 89 of 178, and the same book with
+  the names matched showed the normal count.
+- kepubverto now writes both names the same way, in a valid spelling: the
+  manifest's, with a raw space in it written `%20`. Only those attribute
+  values change, in the package document, the NCX or the navigation
+  document. Names that already agree are left alone, as is a name that
+  differs only in letter case, which is a broken reference for epubsana to
+  repair.
+- A KEPUB converted by an earlier version is fixed by converting it again:
+  its documents stay as they are, and only the names change.
+- On the 562-book shelf, with no option and with `--hyphens auto` plus two
+  `--css` values: 553 books come out byte for byte as with 0.5.1, the 9
+  whose names disagreed now agree, and graded by epubveri 0.43.0 the
+  conversion adds no findings at any severity.
+
 ## [0.5.1] - 2026-11-14
 
 ### Changed

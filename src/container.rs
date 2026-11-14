@@ -141,22 +141,26 @@ pub struct Package {
     pub documents: Vec<(String, String)>,
 }
 
-/// Find the package document through `META-INF/container.xml` and read its
-/// manifest.
-pub fn package(c: &mut Container) -> Result<Package, Error> {
+/// The package document's path, from `META-INF/container.xml`.
+pub(crate) fn rootfile(c: &mut Container) -> Result<String, Error> {
     let xml = c
         .read("META-INF/container.xml")?
         .ok_or_else(|| Error::NotAnEpub("META-INF/container.xml is missing".into()))?;
     let xml = text(&xml, "META-INF/container.xml")?;
     let doc = parse(&xml, "META-INF/container.xml")?;
-    let rootfile = doc
-        .descendants()
+    doc.descendants()
         .filter(|n| n.has_tag_name("rootfile"))
         .find(|n| n.attribute("media-type") == Some("application/oebps-package+xml"))
         .or_else(|| doc.descendants().find(|n| n.has_tag_name("rootfile")))
         .and_then(|n| n.attribute("full-path"))
-        .ok_or_else(|| Error::NotAnEpub("container.xml names no package document".into()))?
-        .to_string();
+        .map(str::to_string)
+        .ok_or_else(|| Error::NotAnEpub("container.xml names no package document".into()))
+}
+
+/// Find the package document through `META-INF/container.xml` and read its
+/// manifest.
+pub fn package(c: &mut Container) -> Result<Package, Error> {
+    let rootfile = rootfile(c)?;
 
     let opf = c
         .read(&rootfile)?
@@ -226,7 +230,7 @@ fn resolve(base: &str, href: &str) -> String {
     parts.join("/")
 }
 
-fn percent_decode(s: &str) -> String {
+pub(crate) fn percent_decode(s: &str) -> String {
     let b = s.as_bytes();
     let mut out = Vec::with_capacity(b.len());
     let mut i = 0;

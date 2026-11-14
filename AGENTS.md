@@ -23,6 +23,10 @@ In each content document the conversion makes three insertions:
 3. One `<style>` element at the end of `<head>`.
 
 On request it adds a second `<style>` (`--hyphens`) and a further one (`--css`).
+Where the NCX or the navigation document spells a file differently from the
+manifest (`%27` against `'`), both are written in one valid spelling, because
+Kobo's renderer otherwise counts the book twice (kepubify#107; `docs/SPANS.md`,
+"File names in the table of contents").
 A content document is every manifest item of type `application/xhtml+xml`,
 the navigation document included, or `text/html`.
 
@@ -61,9 +65,11 @@ Rules the code follows:
 - **It has no in-place mode.** The output is never the input.
 - **It converts one book per run.** Batch conversion belongs to plugins and
   shell loops.
-- **It makes no OPF changes yet.** The EPUB 2 cover fix waits on a device test,
-  and must write EPUB 2 syntax in EPUB 2 (`<meta name="cover">`, no
-  `properties`), with namespace prefixes taken from the document.
+- **Its one OPF change is a file name's spelling** (above). The EPUB 2 cover
+  fix waits on a device test, and must write EPUB 2 syntax in EPUB 2
+  (`<meta name="cover">`, no `properties`), with namespace prefixes taken from
+  the document. A reference that differs only in letter case is a broken one,
+  left to epubsana.
 - **It does not yet offer** kepubify's smart punctuation, find and replace,
   fullscreen CSS, character-set rewriting, or leftover-file removal. Each comes
   in its own release, with its own section in `docs/SPANS.md`. It never adds a
@@ -311,8 +317,10 @@ quoting any of this about v5.
 | `src/content.rs` | One content document: spans, divs, style, outcomes and codes |
 | `src/segment.rs` | Sentence segmentation |
 | `src/css.rs` | Checking and writing `--css` |
+| `src/names.rs` | One spelling for a file in the manifest, the NCX and the nav |
 | `tests/convert.rs` | Conversion rules |
 | `tests/validity.rs` | Fixtures graded by epubveri before and after |
+| `tests/names.rs` | File-name spelling, graded by epubveri before and after |
 | `tests/cli.rs` | Exit codes, refusals, output naming |
 | `docs/SPANS.md` | The behaviour document, written before the code |
 | `kepubverto-wasm/` | The WebAssembly member and the web page (`demo/`) |

@@ -31,7 +31,9 @@ wrappers around sentences and images, with identifiers derived mechanically
 from their position; the `book-columns` / `book-inner` wrapper divs; and one small
 `<style>` rule for them. If you ask for it (`--hyphens`), one more `<style>`
 rule that turns hyphenation on or off; with `--css`, one more `<style>`
-holding the CSS you supply. Optional fixes you switch on change your
+holding the CSS you supply. Where the table of contents and the manifest
+spell a file name differently, it writes both the same way, so that a Kobo
+counts the book's pages once. Optional fixes you switch on change your
 own text or add CSS you supply. Nothing expressive of ours, and nothing we would have any
 claim over even if the license reached the output, which it does not.
 

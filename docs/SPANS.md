@@ -44,7 +44,10 @@ The conversion changes three things in an XHTML content document:
 
 With `--hyphens`, it appends a second `<style>` element after that one
 ([Hyphenation](#hyphenation---hyphens)), and with `--css`, one more after
-that ([Extra CSS](#extra-css---css)). Nothing else is optional.
+that ([Extra CSS](#extra-css---css)). Nothing else is optional. Outside the
+content documents, it changes one thing: the spelling of a file name where
+the table of contents and the manifest disagree
+([File names in the table of contents](#file-names-in-the-table-of-contents)).
 
 Every byte of the original document that is not one of these insertions is
 written out unchanged. kepubverto does not re-serialize documents: the XML
@@ -410,6 +413,89 @@ finding in every EPUB 3 one, a document that is no longer well-formed when the
 CSS holds `&` (even in a comment), and markup injected when it holds
 `</style>`.
 
+## File names in the table of contents
+
+**Status: built in 0.5.2** (decided by Baris, 2026-11-14). The first change
+outside the content documents.
+
+Kobo's KEPUB renderer matches the table of contents to the manifest by the
+file name as it is written, not by the file it names. When the NCX or the
+EPUB 3 navigation document spells a file one way and the manifest another
+(`Ugultulu%20tepeler.html` against `Ugultulu tepeler.html`, or
+`Agatha%27nin.html` against `Agatha'nin.html`), both point to the same entry
+in the container, but the renderer counts the book twice: page numbers start
+halfway, the total is doubled, and the table of contents jumps to the second
+copy. The same book read as an EPUB is not affected. kepubify#107 describes
+it on firmware 4.44.23552; kepubify 5.0.0 works around it.
+
+Seen on a Kobo (firmware 4.38.23852, 2026-11-14), with *Agatha'nın Anahtarı*,
+whose NCX writes `%27` for each of its 10 references and whose manifest writes
+`'`: converted by kepubverto 0.5.1, it opens on page 89 of 178. The same
+output with the NCX respelled to the manifest's `'`, kepubify 5.0.0's output,
+and the original EPUB all show the normal page count.
+
+**What is compared.** Each manifest `item`'s `href`, resolved against the
+package document, and each reference in the table of contents, resolved
+against its own file, with any fragment dropped: every `content/@src` of the
+NCX and every `a/@href` inside a `nav` of the navigation document. A reference
+*differs in spelling* when it and a manifest `href` are different strings that
+are the same after percent-decoding both.
+
+**What changes.** Only the references that differ in spelling, and only the
+attribute value:
+
+- When the manifest's spelling is a valid URL, each reference that differs is
+  rewritten to it. *Agatha'nın Anahtarı*'s `%27` becomes `'`, which a URL
+  allows as it is.
+- When the manifest's spelling holds a character a URL must encode (a raw
+  space, for example), the manifest `href` is rewritten with that character
+  percent-encoded, and nothing else in it. Every reference in the table of
+  contents to that item is then rewritten to the same text, including one that
+  matched the old raw spelling. The shelf's 7 such books write `%20` in the
+  NCX, so there it is the manifest that changes. A manifest `href` with a raw
+  space that no reference spells differently is left as it is.
+
+The new value is written in the attribute's own quotes, with `&` and a quote
+that matches them written as character references. Every other byte of the
+package document, the NCX and the navigation document stays as it was, as in
+a content document. The spine refers to items by `id`, so it is not touched.
+The links between content documents are not compared: the renderer does not
+match them to the manifest.
+
+**What does not change.**
+
+- A reference that matches the manifest exactly, even when both write a raw
+  space (14 shelf books do): the renderer sees one name, and kepubverto does
+  not repair books.
+- A reference that differs only in letter case. In a ZIP container,
+  `Chapter1.html` and `chapter1.html` are different entries, so that is a
+  broken reference, which is epubsana's to repair. No shelf book has one.
+- A reference to no manifest item.
+- A package document, NCX or navigation document that is not well-formed: it
+  is left as it is, like a content document.
+
+This is not validation: nothing is checked against the EPUB specification at
+run time. The rewritten value is always a valid spelling of the same file, so
+it adds no finding; where the manifest wrote a raw space, its RSC-020 error
+goes away. There is no option: the change has no effect on a book whose names
+already agree, and a book that epubsana has repaired arrives with them in
+agreement.
+
+**On the shelf** (2026-11-14, `tools/refspell.py`): 9 of the 562 books, all
+EPUB 2, spell some references differently. 7 write a raw space in the
+manifest and `%20` in the NCX, which epubveri reports as RSC-020 and epubsana
+0.41.0 repairs. 2 write `'` or `(` in the manifest and `%27` or `%28` in the
+NCX, both valid, so no other tool changes them. No book differs in letter
+case, and no EPUB 3 book differs at all.
+
+Converted by 0.5.2 (2026-11-14), with no option and with `--hyphens auto`
+plus two `--css` values: no book's names differ any more, 553 books are byte
+for byte 0.5.1's output and the other 9 are those above, and graded by
+epubveri 0.43.0 the conversion adds no findings at any severity. The output
+for *Agatha'nın Anahtarı* is, entry for entry, the file that showed the normal
+page count on the device, and converting 0.5.1's KEPUB of it again gives the
+same file.
+
 ## How "never make a book worse" is kept
 
 kepubverto converts. It does not validate. Checking a book belongs to
@@ -536,7 +622,8 @@ of the input, and epubveri reports it once, as before the conversion.
 kepubify also changes things this version leaves alone:
 
 - character-set declarations in content documents;
-- the OPF (cover metadata);
+- the OPF (cover metadata); its one OPF change is a file name's spelling
+  ([File names in the table of contents](#file-names-in-the-table-of-contents));
 - leftover files from other tools (`__MACOSX/`, `.DS_Store`, …);
 - optional features: smart punctuation, find and replace, fullscreen CSS,
   extra CSS, a generated title page. (Hyphenation is in: see

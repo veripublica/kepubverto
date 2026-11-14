@@ -24,10 +24,9 @@
 pub mod container;
 pub mod content;
 mod css;
+mod names;
 mod segment;
 mod zipwrite;
-
-use std::collections::BTreeMap;
 
 pub use content::{Hyphens, Outcome, Reason, codes};
 pub use css::{CssError, CssFinding, CssReason};
@@ -155,13 +154,20 @@ pub fn convert_with(epub: &[u8], options: &Options) -> Result<Conversion, Error>
     } else {
         Some(css::prepare(&options.css, package.epub3).map_err(Error::Css)?)
     };
-    let mut changed = BTreeMap::new();
+    // The table of contents and the manifest in one spelling (docs/SPANS.md,
+    // "File names in the table of contents"). A respelled navigation document
+    // is converted from its respelled text.
+    let mut changed = names::respell(&mut c);
     let mut documents = Vec::with_capacity(package.documents.len());
     for (path, media_type) in package.documents {
         let outcome = if !c.has(&path) {
             Outcome::LeftAlone(Reason::Missing)
         } else {
-            match c.read(&path) {
+            let read = match changed.get(&path) {
+                Some(respelled) => Ok(Some(respelled.clone())),
+                None => c.read(&path),
+            };
+            match read {
                 Ok(Some(bytes)) => {
                     let (outcome, out) =
                         content::convert(&bytes, package.epub3, options.hyphens, css.as_deref());
