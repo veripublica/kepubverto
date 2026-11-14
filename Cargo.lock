@@ -159,7 +159,7 @@ dependencies = [
 
 [[package]]
 name = "kepubverto"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "epubveri",
  "flate2",
@@ -172,7 +172,7 @@ dependencies = [
 
 [[package]]
 name = "kepubverto-wasm"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "kepubverto",
  "serde",

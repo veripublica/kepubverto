@@ -5,7 +5,7 @@ true at every release. What the conversion does, rule by rule, and every
 measurement run are in [`docs/SPANS.md`](docs/SPANS.md). Past changes:
 `CHANGELOG.md`. API docs: <https://docs.rs/kepubverto>.
 
-Figures below name the versions they were measured on. Current version: 0.5.1.
+Figures below name the versions they were measured on. Current version: 0.5.2.
 
 ## Scope
 
