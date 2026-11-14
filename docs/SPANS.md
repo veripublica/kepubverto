@@ -524,6 +524,13 @@ epubveri 0.43.0, with no option and with those options: findings added 0 at
 every severity, the same exit codes, spans identical to kepubify's in the same
 542.
 
+EPUBCheck 5.4.0 counts more errors after the conversion in 9 EPUB 2 books of
+the shelf (2026-11-14), all of them invalid already: a `u` or `font` element,
+which XHTML 1.1 does not have, or an `img` without `alt`. With a span inside
+or around such an element, EPUBCheck reports the same element twice, once at
+the element and again where the span ends. The fault and its place are those
+of the input, and epubveri reports it once, as before the conversion.
+
 ## What kepubverto does not do (in this version)
 
 kepubify also changes things this version leaves alone:
