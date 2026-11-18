@@ -32,12 +32,12 @@ epubveri = "0.43.0"
 # requirement follows epubveri's own, as epubsana's does.
 styloria = "0.20.0"
 # Pure Rust: the "deflate" feature uses zlib-rs; bzip2/zstd (C) stay disabled.
-# The family shares one zip, at crates.io's newest (R19, 2026-11-11: 9.5.1).
+# The family shares one zip, at crates.io's newest (R19, 2026-11-18: 9.7.0).
 # 9.3.0 brought the reader fixes merged after 9.1.3, which no advisory listed
 # on 2026-11-03; 9.1.3 was for GHSA-m665-v7pm-7grj, GHSA-gmfj-vffv-32pw and
 # GHSA-wjr6-mhvj-cjvm. zip only reads here: the container is written by
 # `src/zipwrite.rs`.
-zip = { version = "9.5.1", default-features = false, features = ["deflate"] }
+zip = { version = "9.7.0", default-features = false, features = ["deflate"] }
 # Inflates stored and deflated entries in `Container::read`, as epubveri and
 # epubsana do: zip 9 refuses an entry longer than its header declares, and one
 # with a wrong CRC, where epubcheck reads both. Same version and pure-Rust
