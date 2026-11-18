@@ -122,7 +122,9 @@ argument, not the book. Since epubveri 0.37 that check includes CSS values
 Since epubveri 0.41, EPUB 3 accepts a nested rule (CSS Nesting, `p { span { … } }`)
 and refuses a selector with an undeclared namespace prefix (`svg|rect`) or a
 comment left open; EPUB 2 still refuses nesting. A reader that does not know
-CSS Nesting drops the nested rule, so it adds nothing there.
+CSS Nesting drops the nested rule, so it adds nothing there. Since epubveri
+0.46 (styloria 0.21), `p::before:first-child`, `columns: stretch` and
+`font-family: ui-serif foo` are refused, and `::part(a)::part(b)` is accepted.
 
 ```sh
 kepubverto -i book.epub                 # writes book.kepub.epub
@@ -264,8 +266,8 @@ as already converted: converting twice changes nothing.
 ## Measurements
 
 From the test shelf, 562 real books, kepubify 4.0.4 as the oracle. The shelf is
-private and never goes to public CI. Latest run: 2026-11-14, graded by epubveri
-0.43.0, with no option and with `--hyphens auto` plus two `--css` values. Every
+private and never goes to public CI. Latest run: 2026-11-18, graded by epubveri
+0.47.0, with no option and with `--hyphens auto` plus two `--css` values. Every
 earlier run is in `docs/SPANS.md`.
 
 - Findings added by the conversion, every severity: **0**.

@@ -392,7 +392,11 @@ A value is refused, and nothing is converted (exit 2), when:
   serialized text is checked the same way before it is written. So the
   accepted CSS is epubveri's: in EPUB 3 a nested style rule (CSS Nesting) is
   accepted, as epubveri 0.41 grades it, even though an older reading system
-  drops it; in EPUB 2 it is CSS-008 and refused.
+  drops it; in EPUB 2 it is CSS-008 and refused. Since epubveri 0.46
+  (styloria 0.21), a pseudo-class that may not follow a pseudo-element
+  (`p::before:first-child`) and the values the CSS specification dropped
+  (`columns: stretch`, `font-family: ui-serif foo`) are refused, and
+  `::part(a)::part(b)` is accepted.
 - **It is empty**, or holds only whitespace and comments.
 
 This checks the argument, not the book: kepubverto still does not validate
@@ -609,6 +613,13 @@ books: the converted book, stderr and the exit code are byte for byte those of
 epubveri 0.43.0, with no option and with those options: findings added 0 at
 every severity, the same exit codes, spans identical to kepubify's in the same
 542.
+
+The dependency move of R19's second round (2026-11-18: epubveri 0.47.0,
+styloria 0.21.0, zip 9.7.0), all 562 books: the converted book, stderr and the
+exit code are byte for byte those of 0.5.2, with no option and with the same
+options. The shelf A/B graded by epubveri 0.47.0, with no option and with
+those options: findings added 0 at every severity, the same exit codes, spans
+identical to kepubify's in the same 542.
 
 EPUBCheck 5.4.0 counts more errors after the conversion in 9 EPUB 2 books of
 the shelf (2026-11-14), all of them invalid already: a `u` or `font` element,

@@ -8,6 +8,23 @@ kepubverto is pre-1.0, so breaking changes land as minor-version bumps
 (`0.x.0`), per [Cargo's SemVer compatibility
 rules](https://doc.rust-lang.org/cargo/reference/semver.html).
 
+## [Unreleased]
+
+### Changed
+
+- epubveri 0.47.0 (was 0.43.0), styloria 0.21.0 (was 0.20.0) and zip 9.7.0
+  (was 9.5.1). Converted books are byte for byte the same as 0.5.2's on the
+  562-book shelf, with no option and with `--hyphens auto` plus two `--css`
+  values, and graded by epubveri 0.47.0 they gain no findings at any
+  severity.
+- `--css` follows styloria 0.21's CSS rules, in EPUB 3 and EPUB 2. Now
+  refused: a pseudo-class that may not follow a pseudo-element
+  (`p::before:first-child`), the `column-width` and `columns` values the CSS
+  specification dropped (`stretch`, `min-content`, `max-content`,
+  `fit-content`, `contain`), and `ui-serif`, `ui-sans-serif`, `ui-monospace`
+  or `ui-rounded` used as a family name (`font-family: ui-serif foo`). Now
+  accepted: `::part(a)::part(b)` and `::-webkit-scrollbar:horizontal`.
+
 ## [0.5.2] - 2026-11-14
 
 ### Fixed
