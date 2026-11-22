@@ -447,6 +447,24 @@ fn an_option_takes_a_span_where_html_allows_one() {
     assert!(out.contains("<option>a</option>"), "{out}");
 }
 
+/// HTML's raw text and escapable raw text elements are skipped and not
+/// counted, as kepubify 5 does (docs/SPANS.md, "Elements").
+#[test]
+fn a_textarea_is_skipped_and_not_counted() {
+    for e in ["textarea", "title", "iframe", "xmp", "noembed", "noframes"] {
+        let doc = page(EPUB3_HEAD, &format!("<p>a. <{e}>t. u</{e}> b. c</p>"));
+        let out = entry(
+            &convert(&book(true, &[&doc])).unwrap().epub,
+            "OEBPS/Text/c0.xhtml",
+        );
+        assert!(out.contains(&format!("<{e}>t. u</{e}>")), "{e}: {out}");
+        assert!(
+            out.contains(r#"<span class="koboSpan" id="kobo.1.2"> b. </span>"#),
+            "{e}: {out}"
+        );
+    }
+}
+
 #[test]
 fn where_a_span_is_invalid_it_is_counted_and_left_out() {
     // kepubify gives the option text kobo.0.1 and the paragraph kobo.1.1.

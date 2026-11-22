@@ -17,6 +17,11 @@ rules](https://doc.rust-lang.org/cargo/reference/semver.html).
   content there, and kepubify 5.0.0 adds the same spans with the same ids.
   With `label`, or in a `datalist`, an `option` holds text only, and it is
   still counted and not wrapped. EPUB 2's `option` is unchanged (text only).
+- The text of a `textarea` is no longer counted, as kepubify 5.0.0 does not
+  count it, so the spans after one in the same paragraph get kepubify 5's ids.
+  It was counted and not wrapped. The same holds for `title`, `iframe`,
+  `xmp`, `noembed` and `noframes` in the body, which an HTML parser reads as
+  text alone; text in them is an error already.
 
 ### Changed
 

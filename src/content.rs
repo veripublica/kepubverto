@@ -403,7 +403,11 @@ impl Walk<'_> {
         }
         if n.tag_name().namespace() == Some(XHTML_NS) {
             match name {
-                "script" | "style" | "pre" | "audio" | "video" => {
+                // The last six are HTML's raw text and escapable raw text
+                // elements, which kepubify 5 does not count (docs/SPANS.md,
+                // "Elements").
+                "script" | "style" | "pre" | "audio" | "video" | "textarea" | "title"
+                | "iframe" | "xmp" | "noembed" | "noframes" => {
                     return Ok(());
                 }
                 "img" => {
@@ -443,9 +447,10 @@ impl Walk<'_> {
             return true;
         }
         match n.tag_name().name() {
-            "textarea" | "select" | "optgroup" | "datalist" | "picture" | "table" | "thead"
-            | "tbody" | "tfoot" | "tr" | "colgroup" | "ul" | "ol" | "dl" | "hgroup" | "html"
-            | "head" => false,
+            "select" | "optgroup" | "datalist" | "picture" | "table" | "thead" | "tbody"
+            | "tfoot" | "tr" | "colgroup" | "ul" | "ol" | "dl" | "hgroup" | "html" | "head" => {
+                false
+            }
             // HTML's content model: phrasing content without `label` outside
             // a `datalist`, text otherwise. XHTML 1.1: text only.
             "option" => {

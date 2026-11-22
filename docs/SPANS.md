@@ -122,6 +122,7 @@ flag, initially off.
 | Element | Effect |
 |---|---|
 | `script`, `style`, `pre`, `audio`, `video`, `svg`, `math` | Skipped with everything inside it. No spans are added inside, and the counters do not move. *(oracle)* |
+| `textarea`, `title`, `iframe`, `xmp`, `noembed`, `noframes` | Skipped the same way. An HTML parser reads their content as text that holds no elements, and kepubify 5 does not count it. Only `textarea` holds text in a valid book; text in the others is an error already. *(oracle)* |
 | `p`, `ol`, `ul`, `table`, `h1` to `h6` | Sets **pending**, then its contents are walked. An empty `<p/>` sets **pending** like `<p></p>`. *(oracle)* |
 | `img` | P increases by 1, S becomes 1, **pending** is cleared, and the `img` is wrapped in a span `kobo.P.1`. *(oracle)* |
 | any other element (`div`, `li`, `span`, `a`, `blockquote`, …) | Its contents are walked. The counters are not affected. |
@@ -138,8 +139,8 @@ number of its own.
 ### Where a span would be invalid
 
 kepubify wraps text and images wherever it finds them, including places
-where a `span` is not allowed: text in a `textarea` (kepubify 4.0.4 only) or
-in some `option`s, an `img` in a `picture`, and, in EPUB 2, text directly in
+where a `span` is not allowed: text in some `option`s, an `img` in a
+`picture`, and, in EPUB 2, text directly in
 a `blockquote` (XHTML 1.1 allows only block content there). The result is invalid: on the test shelf, two
 books gained 3,994 `RSC-005` errors this way.
 
@@ -149,7 +150,7 @@ added, so every span that is added carries kepubify's id; the ids that are
 left out are simply absent. *(oracle: the spans kepubverto adds are a subset
 of kepubify's, with the same ids)*
 
-A `span` is not allowed as a child of these XHTML elements: `textarea`,
+A `span` is not allowed as a child of these XHTML elements:
 `select`, `optgroup`, `datalist`, `picture`, `table`, `thead`, `tbody`,
 `tfoot`, `tr`, `colgroup`, `ul`, `ol`, `dl`, `hgroup`. In EPUB 2 also
 `option`, `blockquote`, `form`, `noscript` and `map`, and `body` itself,
@@ -175,8 +176,7 @@ kepubify 5.0.0 wraps the text of every `option` and counts it; kepubverto
 counts it too, so the ids match in every case and the spans are added in the
 third. *(oracle)*
 
-Text in a `textarea`, or in an `option` that takes no span, is valid; the
-rule keeps it valid. Anywhere else in the list, only whitespace is valid, and
+Text in an `option` that takes no span is valid; the rule keeps it valid. Anywhere else in the list, only whitespace is valid, and
 whitespace-only text there is not wrapped anyway (see below), so the rule
 only reaches text or images that already make the document invalid. The book
 stays as invalid as it was, and gets no worse.
