@@ -8,7 +8,11 @@ compare. The aim is compatibility with what kepubify produces, not with how it
 is built: kepubverto contains no kepubify code.
 
 Every *(oracle)* rule was checked against kepubify 4.0.4 on synthetic
-documents on 2026-10-09. The oracle is run with `--no-add-dummy-titlepage`,
+documents on 2026-10-09. kepubify 5.0.0 is the oracle since 2026-11-22: on
+the synthetic documents of 2026-11-23 (CDATA, `option`, `textarea` included),
+the spans kepubverto adds are kepubify 5.0.0's, the rest left out where they
+would be invalid. Rules not yet re-checked against 5.0.0 in a section of their
+own still name 4.0.4. The oracle is run with `--no-add-dummy-titlepage`,
 because by default kepubify may add a title page and change the OPF, which
 this version does not do.
 
@@ -667,6 +671,12 @@ with kepubify 5.0.0 as the oracle, with no option and with those options:
 findings added 0 at every severity, the same exit codes, spans identical to
 kepubify 5.0.0's in 546 books (the other 16 as in
 [Measurements](../AGENTS.md#measurements)).
+
+The 0.6.0 run (2026-11-23: CDATA as text, `option` in EPUB 3, `textarea`
+uncounted, each as kepubify 5.0.0 does), all 562 books: the converted book,
+stderr and the exit code are byte for byte those of the dependency move above,
+with no option. No shelf book has CDATA in body text, an `option` or a
+`textarea`, so the shelf A/B above stands for 0.6.0.
 
 EPUBCheck 5.4.0 counts more errors after the conversion in 9 EPUB 2 books of
 the shelf (2026-11-14), all of them invalid already: a `u` or `font` element,
