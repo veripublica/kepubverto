@@ -125,6 +125,10 @@ comment left open; EPUB 2 still refuses nesting. A reader that does not know
 CSS Nesting drops the nested rule, so it adds nothing there. Since epubveri
 0.46 (styloria 0.21), `p::before:first-child`, `columns: stretch` and
 `font-family: ui-serif foo` are refused, and `::part(a)::part(b)` is accepted.
+Since epubveri 0.48, CSS-001 applies only to a `direction` or `unicode-bidi`
+declaration the parsed style sheet keeps, so one inside `@supports` with a
+condition that does not parse is accepted (EPUBCheck still reports it,
+w3c/epubcheck#1781).
 
 ```sh
 kepubverto -i book.epub                 # writes book.kepub.epub
@@ -265,18 +269,18 @@ as already converted: converting twice changes nothing.
 
 ## Measurements
 
-From the test shelf, 562 real books, kepubify 4.0.4 as the oracle. The shelf is
-private and never goes to public CI. Latest run: 2026-11-18, graded by epubveri
-0.47.0, with no option and with `--hyphens auto` plus two `--css` values. Every
-earlier run is in `docs/SPANS.md`.
+From the test shelf, 562 real books, kepubify 5.0.0 as the oracle (4.0.4 until
+2026-11-22). The shelf is private and never goes to public CI. Latest run:
+2026-11-23, graded by epubveri 0.50.0, with no option and with `--hyphens auto`
+plus two `--css` values. Every earlier run is in `docs/SPANS.md`.
 
 - Findings added by the conversion, every severity: **0**.
-- Books whose spans are identical to kepubify's: **542**. In the other 20, as
-  analysed at 0.2.0 and 0.5.0: 13 have markup an HTML parser rebuilds (a block
-  inside a `p`, or a self-closed non-void element), 5 have spans left out where
-  they would be invalid, the rest carrying kepubify's ids, and 2 have matching ids
-  with text that differs because an HTML parser maps `&#128;`–`&#159;` onto
-  Windows-1252.
+- Books whose spans are identical to kepubify 5.0.0's: **546**. In the other 16,
+  as analysed on 2026-11-22: 8 have a block inside a `p`, which kepubify's HTML
+  parser rebuilds; 5 have spans left out where they would be invalid, the rest
+  carrying kepubify's ids; 2 have matching ids with text that differs where
+  the bytes do not decode; and 1 is already a KEPUB, which kepubify 5 copies
+  unchanged and kepubverto converts in its one document without spans.
 
 Converted books have also been read on a real Kobo.
 

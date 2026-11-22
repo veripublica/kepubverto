@@ -23,6 +23,12 @@ rules](https://doc.rust-lang.org/cargo/reference/semver.html).
   veripublica crate declares. zip 9.8.1 needs at least 1.89.
 - zip 9.8.1 (was 9.7.0), used for reading only. The output is byte for byte
   the same on the test shelf.
+- epubveri 0.50.0 (was 0.47.0) and styloria 0.23.1 (was 0.21.0). Converted
+  books are byte for byte the same on the test shelf, and graded by epubveri
+  0.50.0 the conversion adds no findings. `--css` follows epubveri 0.48's
+  CSS-001: a `direction` or `unicode-bidi` declaration the parsed style sheet
+  does not keep, such as one inside `@supports foo { … }`, is now accepted in
+  EPUB 3.
 
 ## [0.5.3] - 2026-11-18
 

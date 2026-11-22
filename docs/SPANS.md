@@ -411,7 +411,9 @@ A value is refused, and nothing is converted (exit 2), when:
   (styloria 0.21), a pseudo-class that may not follow a pseudo-element
   (`p::before:first-child`) and the values the CSS specification dropped
   (`columns: stretch`, `font-family: ui-serif foo`) are refused, and
-  `::part(a)::part(b)` is accepted.
+  `::part(a)::part(b)` is accepted. Since epubveri 0.48, CSS-001 is drawn only
+  by a `direction` or `unicode-bidi` declaration the parsed style sheet keeps,
+  so `@supports foo { p { direction: rtl } }` is accepted in EPUB 3.
 - **It is empty**, or holds only whitespace and comments.
 
 This checks the argument, not the book: kepubverto still does not validate
@@ -635,6 +637,15 @@ exit code are byte for byte those of 0.5.2, with no option and with the same
 options. The shelf A/B graded by epubveri 0.47.0, with no option and with
 those options: findings added 0 at every severity, the same exit codes, spans
 identical to kepubify's in the same 542.
+
+The dependency move of R19's third round (2026-11-23: zip 9.8.1, then epubveri
+0.50.0 and styloria 0.23.1), all 562 books: the converted book, stderr and the
+exit code are byte for byte those of the commit before each move, with no
+option and with the same options. The shelf A/B graded by epubveri 0.50.0,
+with kepubify 5.0.0 as the oracle, with no option and with those options:
+findings added 0 at every severity, the same exit codes, spans identical to
+kepubify 5.0.0's in 546 books (the other 16 as in
+[Measurements](../AGENTS.md#measurements)).
 
 EPUBCheck 5.4.0 counts more errors after the conversion in 9 EPUB 2 books of
 the shelf (2026-11-14), all of them invalid already: a `u` or `font` element,
