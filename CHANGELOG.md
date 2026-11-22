@@ -19,6 +19,10 @@ rules](https://doc.rust-lang.org/cargo/reference/semver.html).
   before the tag and opens it again after, so the text is unchanged. On the
   test shelf (562 books, none with CDATA in body text) the output is byte for
   byte 0.5.3's.
+- The minimum supported Rust version is 1.95 (was 1.88), the version every
+  veripublica crate declares. zip 9.8.1 needs at least 1.89.
+- zip 9.8.1 (was 9.7.0), used for reading only. The output is byte for byte
+  the same on the test shelf.
 
 ## [0.5.3] - 2026-11-18
 

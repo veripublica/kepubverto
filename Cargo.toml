@@ -2,7 +2,7 @@
 name = "kepubverto"
 version = "0.5.3"
 edition = "2024"
-rust-version = "1.88"
+rust-version = "1.95"
 description = "Converts EPUB to KEPUB for Kobo e-readers, in pure Rust, without making the book worse."
 license = "AGPL-3.0-only OR LicenseRef-veripublica-Commercial"
 repository = "https://github.com/veripublica/kepubverto"
@@ -37,7 +37,7 @@ styloria = "0.21.0"
 # on 2026-11-03; 9.1.3 was for GHSA-m665-v7pm-7grj, GHSA-gmfj-vffv-32pw and
 # GHSA-wjr6-mhvj-cjvm. zip only reads here: the container is written by
 # `src/zipwrite.rs`.
-zip = { version = "9.7.0", default-features = false, features = ["deflate"] }
+zip = { version = "9.8.1", default-features = false, features = ["deflate"] }
 # Inflates stored and deflated entries in `Container::read`, as epubveri and
 # epubsana do: zip 9 refuses an entry longer than its header declares, and one
 # with a wrong CRC, where epubcheck reads both. Same version and pure-Rust

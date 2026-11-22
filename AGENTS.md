@@ -357,7 +357,7 @@ cargo build -p kepubverto-wasm --target wasm32-unknown-unknown --locked
 ```
 
 CI also builds against the declared minimum epubveri and compiles at the MSRV,
-1.88. `scripts/preflight.sh X.Y.Z` runs all of these before a release, with the
+1.95, the family's one Rust version. `scripts/preflight.sh X.Y.Z` runs all of these before a release, with the
 release checks.
 
 Any change to behaviour goes in `docs/SPANS.md` first, and `LICENSING.md` lists
