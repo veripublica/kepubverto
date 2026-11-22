@@ -8,6 +8,18 @@ kepubverto is pre-1.0, so breaking changes land as minor-version bumps
 (`0.x.0`), per [Cargo's SemVer compatibility
 rules](https://doc.rust-lang.org/cargo/reference/semver.html).
 
+## [Unreleased]
+
+### Changed
+
+- Span numbering follows kepubify 5.0.0, which is now the test oracle. A
+  CDATA section in a content document is text: its content joins the text on
+  either side and is segmented and wrapped with it, where 4.0.4 treated it like
+  a comment. A span that starts or ends inside a section closes the section
+  before the tag and opens it again after, so the text is unchanged. On the
+  test shelf (562 books, none with CDATA in body text) the output is byte for
+  byte 0.5.3's.
+
 ## [0.5.3] - 2026-11-18
 
 ### Changed

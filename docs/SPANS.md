@@ -53,7 +53,9 @@ Every byte of the original document that is not one of these insertions is
 written out unchanged. kepubverto does not re-serialize documents: the XML
 declaration, the DOCTYPE, entity references, namespace prefixes, attribute
 order and quoting, comments, CDATA sections and whitespace all stay exactly as
-they were. A document that is unchanged by the rules below is not rewritten
+they were. The one exception is a span tag that falls inside a CDATA section:
+the section is closed before the tag and opened again after it
+([Text](#text)). A document that is unchanged by the rules below is not rewritten
 at all.
 
 ## Which documents are converted
@@ -204,10 +206,23 @@ paragraph number when **pending** is set. Whitespace-only text directly inside
 any other element (`li`, `h1`, `td`, a `span` inside a `p`, …) is not.
 Both match kepubify. *(oracle)*
 
-A comment, a CDATA section or a processing instruction ends a text node: the
-text on either side of it is segmented and wrapped separately, and its own
-content is never wrapped. (An HTML parser reads a CDATA section as a comment,
-which is why kepubify behaves this way.) *(oracle)*
+A comment or a processing instruction ends a text node: the text on either
+side of it is segmented and wrapped separately, and its own content is never
+wrapped. *(oracle)*
+
+A CDATA section is text. Its content joins the text on either side of it into
+one text node, and that text is segmented as if the section's content were
+written there as plain characters: `&` and `<` inside it are just letters.
+An empty section adds nothing, so `<p><![CDATA[]]></p>` holds no text and gets
+no span. *(oracle)* kepubify writes the content out escaped, without the
+section. kepubverto keeps every section, and when a span begins or ends
+inside one, it closes the section before the tag and opens a new one after
+it. The text stays the same, character for character:
+`<p>abc<![CDATA[x. y]]>def</p>` becomes
+`<p><span …kobo.1.1>abc<![CDATA[x. ]]></span><span …kobo.1.2><![CDATA[y]]>def</span></p>`.
+A span that starts at the beginning of a section's content opens before the
+section. (kepubify 4.0.4 read a CDATA section as a comment, as an HTML parser
+does. kepubify 5 reads it as text, and kepubverto follows 5.)
 
 Text before the first listed element gets P = 0, so ids `kobo.0.1`,
 `kobo.0.2`, ….

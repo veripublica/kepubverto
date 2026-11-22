@@ -484,16 +484,58 @@ fn an_image_whose_caption_stands_in_for_alt_is_counted_and_left_out() {
 }
 
 #[test]
-fn comments_cdata_and_instructions_split_text_and_are_never_wrapped() {
-    let doc = page(
-        EPUB3_HEAD,
-        "<p>abc<![CDATA[x. y]]>def<!-- c. d -->g<?pi x?>h</p>",
-    );
+fn comments_and_instructions_split_text_and_are_never_wrapped() {
+    let doc = page(EPUB3_HEAD, "<p>abc<!-- c. d -->g<?pi x?>h</p>");
     let out = entry(
         &convert(&book(true, &[&doc])).unwrap().epub,
         "OEBPS/Text/c0.xhtml",
     );
-    assert!(out.contains(r#"<p><span class="koboSpan" id="kobo.1.1">abc</span><![CDATA[x. y]]><span class="koboSpan" id="kobo.1.2">def</span><!-- c. d --><span class="koboSpan" id="kobo.1.3">g</span><?pi x?><span class="koboSpan" id="kobo.1.4">h</span></p>"#), "{out}");
+    assert!(out.contains(r#"<p><span class="koboSpan" id="kobo.1.1">abc</span><!-- c. d --><span class="koboSpan" id="kobo.1.2">g</span><?pi x?><span class="koboSpan" id="kobo.1.3">h</span></p>"#), "{out}");
+}
+
+/// A CDATA section is text, joined with the text around it, as kepubify 5
+/// reads it; a span that starts or ends inside one splits the section
+/// (docs/SPANS.md, "Text").
+#[test]
+fn a_cdata_section_is_text_and_split_at_a_span() {
+    let cases = [
+        (
+            "<p>abc<![CDATA[x. y]]>def<!-- c. d -->g</p>",
+            r#"<p><span class="koboSpan" id="kobo.1.1">abc<![CDATA[x. ]]></span><span class="koboSpan" id="kobo.1.2"><![CDATA[y]]>def</span><!-- c. d --><span class="koboSpan" id="kobo.1.3">g</span></p>"#,
+        ),
+        (
+            "<p>a. <![CDATA[b. c]]> d</p>",
+            r#"<p><span class="koboSpan" id="kobo.1.1">a. </span><span class="koboSpan" id="kobo.1.2"><![CDATA[b. ]]></span><span class="koboSpan" id="kobo.1.3"><![CDATA[c]]> d</span></p>"#,
+        ),
+        (
+            "<p><![CDATA[a < b & c. d]]></p>",
+            r#"<p><span class="koboSpan" id="kobo.1.1"><![CDATA[a < b & c. ]]></span><span class="koboSpan" id="kobo.1.2"><![CDATA[d]]></span></p>"#,
+        ),
+        (
+            "<p><![CDATA[x. y. z]]></p>",
+            r#"<p><span class="koboSpan" id="kobo.1.1"><![CDATA[x. ]]></span><span class="koboSpan" id="kobo.1.2"><![CDATA[y. ]]></span><span class="koboSpan" id="kobo.1.3"><![CDATA[z]]></span></p>"#,
+        ),
+        (
+            "<p><![CDATA[]]></p><p>x</p>",
+            r#"<p><![CDATA[]]></p><p><span class="koboSpan" id="kobo.1.1">x</span></p>"#,
+        ),
+        (
+            "<div><![CDATA[ ]]></div><p>x</p>",
+            r#"<div><![CDATA[ ]]></div><p><span class="koboSpan" id="kobo.1.1">x</span></p>"#,
+        ),
+        (
+            "<p><![CDATA[   ]]></p>",
+            r#"<p><span class="koboSpan" id="kobo.1.1"><![CDATA[   ]]></span></p>"#,
+        ),
+    ];
+    for (body, want) in cases {
+        let doc = page(EPUB3_HEAD, body);
+        let out = entry(
+            &convert(&book(true, &[&doc])).unwrap().epub,
+            "OEBPS/Text/c0.xhtml",
+        );
+        assert!(out.contains(want), "{body}: {out}");
+    }
 }
 
 #[test]

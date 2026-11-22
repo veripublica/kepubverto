@@ -27,6 +27,7 @@ const BODIES: &[&str] = &[
     "<blockquote><p>Quoted. Text.</p></blockquote><pre>pre. text</pre>",
     "<p>a<!-- c. d -->b<br/>c. d</p><dl><dt>t</dt><dd>d. e</dd></dl>",
     "<p><a href=\"c0.xhtml\">link. text</a> more. <span>inner</span></p>",
+    "<p>abc<![CDATA[x. y & <z>. w]]>def. <b><![CDATA[b. ]]></b></p><p><![CDATA[]]></p>",
 ];
 
 /// Shapes only EPUB 3 has. An `img` whose caption stands in for `alt` (issue

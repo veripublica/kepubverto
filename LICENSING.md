@@ -28,7 +28,8 @@ program it compiles.
 `kepubverto` does write to your book — that is its job — so it is fair to ask
 what it adds. The conversion itself adds structural markup: `koboSpan`
 wrappers around sentences and images, with identifiers derived mechanically
-from their position; the `book-columns` / `book-inner` wrapper divs; and one small
+from their position (where one starts or ends inside a CDATA section, that
+section is closed and opened again around the tag); the `book-columns` / `book-inner` wrapper divs; and one small
 `<style>` rule for them. If you ask for it (`--hyphens`), one more `<style>`
 rule that turns hyphenation on or off; with `--css`, one more `<style>`
 holding the CSS you supply. Where the table of contents and the manifest

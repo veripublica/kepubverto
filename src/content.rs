@@ -476,14 +476,19 @@ impl Walk<'_> {
         Ok(())
     }
 
-    /// Character data between two elements. Comments, CDATA sections and
-    /// processing instructions end a text run and are never wrapped.
+    /// Character data between two elements. Comments and processing
+    /// instructions end a text run and are never wrapped. A CDATA section is
+    /// part of the run, as text (docs/SPANS.md, "Text").
     fn character_data(&mut self, range: Range<usize>, t: Text) {
         let mut at = range.start;
         let mut run = at;
         while at < range.end {
             let rest = &self.text[at..range.end];
-            let skip = [("<!--", "-->"), ("<![CDATA[", "]]>"), ("<?", "?>")]
+            if rest.starts_with("<![CDATA[") {
+                at += rest.find("]]>").map_or(rest.len(), |i| i + "]]>".len());
+                continue;
+            }
+            let skip = [("<!--", "-->"), ("<?", "?>")]
                 .iter()
                 .find(|(open, _)| rest.starts_with(open))
                 .map(|(open, close)| {
@@ -503,7 +508,13 @@ impl Walk<'_> {
         self.text_run(run..range.end, t);
     }
 
+    /// A tag that falls inside a CDATA section closes the section before it
+    /// and opens a new one after it. Where one span ends and the next begins
+    /// at the same place inside a section, both tags go between one close
+    /// and one open, so no empty section is written.
     fn text_run(&mut self, range: Range<usize>, t: Text) {
+        let at = |p: usize| range.start + p;
+        let mut close: Option<(usize, bool)> = None;
         for seg in segment::segments(&self.text[range.clone()]) {
             if seg.blank && !t.in_p {
                 continue;
@@ -517,14 +528,39 @@ impl Walk<'_> {
             if !t.wrap {
                 continue;
             }
-            self.open_span(range.start + seg.range.start);
-            self.close_span(range.start + seg.range.end);
+            let start = (at(seg.range.start), seg.start_in_cdata);
+            let tag = self.span_tag();
+            match close.take() {
+                Some(end) if end == start && start.1 => self.insert(start, format!("</span>{tag}")),
+                Some(end) => {
+                    self.insert(end, "</span>".to_string());
+                    self.insert(start, tag);
+                }
+                None => self.insert(start, tag),
+            }
+            close = Some((at(seg.range.end), seg.end_in_cdata));
+        }
+        if let Some(end) = close {
+            self.insert(end, "</span>".to_string());
         }
     }
 
-    fn open_span(&mut self, at: usize) {
+    fn insert(&mut self, (at, in_cdata): (usize, bool), tags: String) {
+        let text = if in_cdata {
+            format!("]]>{tags}<![CDATA[")
+        } else {
+            tags
+        };
+        self.edits.push(Edit::new(at, Order::Walk, text));
+    }
+
+    fn span_tag(&mut self) -> String {
         self.spans += 1;
-        let tag = format!(r#"<span class="koboSpan" id="kobo.{}.{}">"#, self.p, self.s);
+        format!(r#"<span class="koboSpan" id="kobo.{}.{}">"#, self.p, self.s)
+    }
+
+    fn open_span(&mut self, at: usize) {
+        let tag = self.span_tag();
         self.edits.push(Edit::new(at, Order::Walk, tag));
     }
 
