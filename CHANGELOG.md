@@ -10,6 +10,14 @@ rules](https://doc.rust-lang.org/cargo/reference/semver.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- EPUB 3: the text of an `option` with no `label` attribute, outside a
+  `datalist`, is wrapped in spans. HTML's content model allows phrasing
+  content there, and kepubify 5.0.0 adds the same spans with the same ids.
+  With `label`, or in a `datalist`, an `option` holds text only, and it is
+  still counted and not wrapped. EPUB 2's `option` is unchanged (text only).
+
 ### Changed
 
 - Span numbering follows kepubify 5.0.0, which is now the test oracle. A

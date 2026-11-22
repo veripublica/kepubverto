@@ -443,9 +443,16 @@ impl Walk<'_> {
             return true;
         }
         match n.tag_name().name() {
-            "option" | "textarea" | "select" | "optgroup" | "datalist" | "picture" | "table"
-            | "thead" | "tbody" | "tfoot" | "tr" | "colgroup" | "ul" | "ol" | "dl" | "hgroup"
-            | "html" | "head" => false,
+            "textarea" | "select" | "optgroup" | "datalist" | "picture" | "table" | "thead"
+            | "tbody" | "tfoot" | "tr" | "colgroup" | "ul" | "ol" | "dl" | "hgroup" | "html"
+            | "head" => false,
+            // HTML's content model: phrasing content without `label` outside
+            // a `datalist`, text otherwise. XHTML 1.1: text only.
+            "option" => {
+                self.epub3
+                    && attr(n, "label").is_none()
+                    && !n.ancestors().skip(1).any(|a| is_xhtml(a, "datalist"))
+            }
             // XHTML 1.1 allows only block content in these.
             "blockquote" | "form" | "noscript" | "map" => self.epub3,
             "body" => self.epub3 || self.body_wrapped,

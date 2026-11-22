@@ -399,16 +399,64 @@ fn existing_divs_and_style_are_not_added_again() {
     assert!(out.contains(r#"<p><span class="koboSpan" id="kobo.1.1">x</span></p>"#));
 }
 
+/// HTML's content model for `option`: a span without `label` outside a
+/// `datalist`, text otherwise; XHTML 1.1 text only. Counted in every case,
+/// as kepubify 5 does (docs/SPANS.md, "Where a span would be invalid").
+#[test]
+fn an_option_takes_a_span_where_html_allows_one() {
+    let span = |id: &str, t: &str| format!(r#"<span class="koboSpan" id="kobo.{id}">{t}</span>"#);
+    let epub3 = [
+        (
+            "<select><option>a. b</option></select>",
+            format!(
+                "<option>{}{}</option>",
+                span("0.1", "a. "),
+                span("0.2", "b")
+            ),
+        ),
+        (
+            "<select><optgroup label=\"g\"><option>a</option></optgroup></select>",
+            format!("<option>{}</option>", span("0.1", "a")),
+        ),
+        (
+            "<select><option label=\"L\">a</option></select>",
+            "<option label=\"L\">a</option>".to_string(),
+        ),
+        (
+            "<datalist id=\"d\"><option>a</option></datalist>",
+            "<option>a</option>".to_string(),
+        ),
+    ];
+    for (form, want) in epub3 {
+        let doc = page(EPUB3_HEAD, &format!("<form>{form}</form><p>after</p>"));
+        let out = entry(
+            &convert(&book(true, &[&doc])).unwrap().epub,
+            "OEBPS/Text/c0.xhtml",
+        );
+        assert!(out.contains(&want), "{form}: {out}");
+        assert!(out.contains(&span("1.1", "after")), "{form}: {out}");
+    }
+    let doc = page(
+        EPUB2_HEAD,
+        "<form><p><select name=\"s\"><option>a</option></select></p></form><p>after</p>",
+    );
+    let out = entry(
+        &convert(&book(false, &[&doc])).unwrap().epub,
+        "OEBPS/Text/c0.xhtml",
+    );
+    assert!(out.contains("<option>a</option>"), "{out}");
+}
+
 #[test]
 fn where_a_span_is_invalid_it_is_counted_and_left_out() {
     // kepubify gives the option text kobo.0.1 and the paragraph kobo.1.1.
     let doc = page(
         EPUB3_HEAD,
-        "<form><select><option>o</option></select></form><picture><img src=\"i.png\" alt=\"\"/></picture><p>after</p>",
+        "<form><select><option label=\"L\">o</option></select></form><picture><img src=\"i.png\" alt=\"\"/></picture><p>after</p>",
     );
     let c = convert(&book(true, &[&doc])).unwrap();
     let out = entry(&c.epub, "OEBPS/Text/c0.xhtml");
-    assert!(out.contains("<option>o</option>"), "{out}");
+    assert!(out.contains("<option label=\"L\">o</option>"), "{out}");
     assert!(out.contains("<picture><img"), "{out}");
     assert!(
         out.contains(r#"<p><span class="koboSpan" id="kobo.2.1">after</span></p>"#),

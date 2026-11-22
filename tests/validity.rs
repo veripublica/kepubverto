@@ -34,6 +34,9 @@ const BODIES: &[&str] = &[
 /// #2): epubveri reports a missing `alt` from 0.39.0 on.
 const EPUB3_BODIES: &[&str] = &[
     "<figure>\n<figcaption>Figure 1. A caption.</figcaption>\n<img src=\"../Images/i.png\"/>\n</figure><p>After it.</p>",
+    // An `option` takes a span only without `label` outside a `datalist`
+    // (HTML's content model; epubveri reports both other cases from 0.50.0).
+    "<p><select name=\"s\"><option>One. Two.</option><optgroup label=\"g\"><option>Three.</option></optgroup><option label=\"L\">Four. Five.</option></select> <input list=\"d\" name=\"i\"/><datalist id=\"d\"><option>Six. Seven.</option></datalist></p>",
 ];
 
 fn bodies(epub3: bool) -> Vec<&'static str> {

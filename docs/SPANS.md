@@ -138,9 +138,9 @@ number of its own.
 ### Where a span would be invalid
 
 kepubify wraps text and images wherever it finds them, including places
-where a `span` is not allowed: text in an `option` or a `textarea`, an `img`
-in a `picture`, and, in EPUB 2, text directly in a `blockquote` (XHTML 1.1
-allows only block content there). The result is invalid: on the test shelf, two
+where a `span` is not allowed: text in a `textarea` (kepubify 4.0.4 only) or
+in some `option`s, an `img` in a `picture`, and, in EPUB 2, text directly in
+a `blockquote` (XHTML 1.1 allows only block content there). The result is invalid: on the test shelf, two
 books gained 3,994 `RSC-005` errors this way.
 
 kepubverto **counts** such a segment or image exactly as the rules below say,
@@ -149,16 +149,37 @@ added, so every span that is added carries kepubify's id; the ids that are
 left out are simply absent. *(oracle: the spans kepubverto adds are a subset
 of kepubify's, with the same ids)*
 
-A `span` is not allowed as a child of these XHTML elements: `option`,
-`textarea`, `select`, `optgroup`, `datalist`, `picture`, `table`, `thead`,
-`tbody`, `tfoot`, `tr`, `colgroup`, `ul`, `ol`, `dl`, `hgroup`. In EPUB 2 also
-`blockquote`, `form`, `noscript` and `map`, and `body` itself, unless the
-divs are added, since text in `body` then ends up in `div#book-inner`.
-Elements in another namespace accept one, as kepubify assumes.
+A `span` is not allowed as a child of these XHTML elements: `textarea`,
+`select`, `optgroup`, `datalist`, `picture`, `table`, `thead`, `tbody`,
+`tfoot`, `tr`, `colgroup`, `ul`, `ol`, `dl`, `hgroup`. In EPUB 2 also
+`option`, `blockquote`, `form`, `noscript` and `map`, and `body` itself,
+unless the divs are added, since text in `body` then ends up in
+`div#book-inner`. Elements in another namespace accept one, as kepubify
+assumes.
 
-Whitespace-only text in these places is not wrapped anyway (see below), so
-the rule only reaches text or images that already make the document invalid.
-The book stays as invalid as it was, and gets no worse.
+**`option` in EPUB 3** takes a span unless it has a `label` attribute or is
+inside a `datalist`. HTML's content model for `option`:
+
+> If the element has a label attribute and a value attribute: Nothing.
+> If the element has a label attribute but no value attribute: Text.
+> If the element has no label attribute and is not a descendant of a datalist
+> element: Zero or more div elements or phrasing content, but there must be no
+> interactive content descendant, datalist element descendant, object element
+> descendant, or descendant with the tabindex attribute specified.
+> If the element has no label attribute and is a descendant of a datalist
+> element: Text.
+
+A `span` with `class` and `id` is phrasing content and none of the things the
+third case excludes. In EPUB 2, XHTML 1.1's `option` holds text only.
+kepubify 5.0.0 wraps the text of every `option` and counts it; kepubverto
+counts it too, so the ids match in every case and the spans are added in the
+third. *(oracle)*
+
+Text in a `textarea`, or in an `option` that takes no span, is valid; the
+rule keeps it valid. Anywhere else in the list, only whitespace is valid, and
+whitespace-only text there is not wrapped anyway (see below), so the rule
+only reaches text or images that already make the document invalid. The book
+stays as invalid as it was, and gets no worse.
 
 **An image whose caption stands in for `alt`.** HTML lets an `img` leave out
 `alt` when the image is all its `figure` holds besides a caption (HTML

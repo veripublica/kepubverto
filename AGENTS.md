@@ -297,8 +297,8 @@ as the EPUB specification requires. Measured differences:
   (2026-10-05).
 - kepubify wraps text and images wherever it finds them, including where a span
   is not allowed. On the shelf, two books gained 3,994 `RSC-005` errors this way.
-  EPUBCheck 5.4.0 now accepts a span in `option`; kepubverto still skips one
-  there, which leaves ids unchanged.
+  In EPUB 3, kepubverto wraps the text of an `option` where HTML's content
+  model allows a span: without a `label` attribute and outside a `datalist`.
 - kepubify also wraps an `img` with no `alt` that its `figure`'s caption stands
   in for. The span ends HTML's exception and the image becomes `RSC-005`
   (epubveri 0.39.0 on; EPUBCheck 5.4.0 does not report it). kepubverto counts
